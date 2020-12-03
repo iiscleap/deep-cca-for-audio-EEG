@@ -79,8 +79,8 @@ def load_data(block=0):
 
 
 
-speech_lcca = True
-if speech_lcca:
+speech_lmlc = True
+if speech_lmlc:
     # subs ARE THE SUBJECTS IDS TO WORK WITH
     # FOR THE LMCCA DENOISING STEP.
     subs = [None]
@@ -257,8 +257,8 @@ if speech_lcca:
 
 
 
-nmedh_lcca = True
-if nmedh_lcca:
+nmedh_lmlc = True
+if nmedh_lmlc:
     # subs ARE THE SUBJECTS IDS TO WORK WITH
     # FOR THE LMCCA DENOISING STEP.
     subs = [None]

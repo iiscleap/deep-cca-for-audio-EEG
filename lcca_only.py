@@ -23,15 +23,6 @@ a = sys.argv[1:]
 eyedee = str(a[0])
 o_dim = int(a[1])   # THE INTERESTED FINAL DIMENSION
 
-# subs ARE THE SUBJECTS IDS TO WORK WITH
-subs = [None]
-subs = sorted(subs) # TO KEEP THEIR IDS SORTED
-n_subs = len(subs)
-
-str_subs = str(subs[0])
-for each_sub in subs[1:]: 
-    str_subs += "_{}".format(each_sub)
-
 print("eyedee : {}".format(eyedee))
 
 # CREATING A FOLDER TO STORE THE RESULTS
@@ -63,22 +54,22 @@ stim_chans_pre = 1
 
 
 # HELPER FUNCTION TO LOAD DATA FOR SPEECH
-def load_data(blocks=0, filtered=True):
+def load_data(subs, block=0, filtered=True):
     # IF THE DATA IS ALREADY PROCESSED THROUGH THE FILTERBANK AND PCA
-    print('blocks = ' + str(blocks))
-    if blocks == num_blocks - 1:
+    print('block: ' + str(block))
+    if block == num_blocks - 1:
         val_idx = 0
     else:
-        val_idx = blocks + 1
+        val_idx = block + 1
 
     if filtered:
-        data_path = 'data1_'+str(blocks)+'.pkl'
+        data_path = 'data1_'+str(block)+'.pkl'
         fp = open(data_path, 'rb')
         data1 = pkl.load(fp)
         fp.close()
         print("Loaded FILTERED Data.")
 
-        print('Data INITIALIZED for block : {}'.format(str(blocks)))
+        print('Data INITIALIZED for block : {}'.format(str(block)))
         data_subs = []
         for sub in subs:
             data_subs.append([data1[0][:,:,sub], data1[1][:,:,sub], data1[2][:,:,sub]])
@@ -86,13 +77,13 @@ def load_data(blocks=0, filtered=True):
         del data1
     else:
         # IF THE DATA IS NOT PROCESSED
-        data_path = 'data1_pre_'+str(blocks)+'.pkl'
+        data_path = 'data1_pre_'+str(block)+'.pkl'
         fp = open(data_path, 'rb')
         pre_data = pkl.load(fp)
         fp.close()
         print("Loaded DEMEANED Data.")
 
-        print('Data INITIALIZED for block : {}'.format(str(blocks)))
+        print('Data INITIALIZED for block : {}'.format(str(block)))
         data_subs_pre = []
         for sub in subs:
             data_subs_pre.append([pre_data[0][:,:,sub], pre_data[1][:,:,sub], pre_data[2][:,:,sub]])
@@ -145,6 +136,16 @@ def lcca(stim5_tr, stim5_val, stim5_te, resp5_tr, resp5_val, resp5_te, sub_num, 
 speech_lcca = True
 if speech_lcca:
     n_blocks = 20        # IF SPEECH DATA BY LIBERTO ET AL.
+
+    # subs ARE THE SUBJECTS IDS TO WORK WITH
+    subs = [None]
+    subs = sorted(subs) # TO KEEP THEIR IDS SORTED
+    n_subs = len(subs)
+
+    str_subs = str(subs[0])
+    for each_sub in subs[1:]: 
+        str_subs += "_{}".format(each_sub)
+
     all_corrs = np.zeros((n_blocks, n_subs))
     all_corrs_name = path_name + 'speech_corrs_{}.npy'.format(str_subs)
 
@@ -153,7 +154,7 @@ if speech_lcca:
     print("num_blocks: {}".format(num_blocks))
 
     for block in range(num_blocks):
-        data_subs = load_data(block)
+        data_subs = load_data(block, subs)
         # data_subs IS A LIST OF N SUBJECTS DATA AND 1 COMMON STIMULUS DATA (AS THE LAST ELEMENT.)
         # ALL THE DATA ARE PROCESSED USING PCA AND THE FILTERBANK
 
@@ -187,7 +188,7 @@ if nmedh_lcca:
     fs = 80
     N = 125
     subs = 58
-    all_corrs = np.zeros((subs, 4, len(D) + 1))
+    all_corrs = np.zeros((subs, 4))
     all_corrs_name = path_name + 'nmedh_corrs.npy'
     rm_list = [0, 8, 20, 23, 24, 34, 37, 40, 45, 46, 53]
 
