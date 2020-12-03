@@ -1,16 +1,12 @@
 import numpy as np
-import pickle
 import pickle as pkl
 import matplotlib.pyplot as plt
 import sys
 import os
 from os import path
 import scipy.io
-import random
-from pdb import set_trace as bp  #################added break point accessor####################
-from scipy.signal import lfilter
 
-from cca_fns import my_standardize, lagGen, my_PCA, apply_PCA, my_corr, linear_cca, cca3_model_new, standardize
+from cca_functions    import *
 from all_linear_stuff import *
 
 def plot_data(x, y,s):
@@ -36,7 +32,7 @@ str_subs = str(subs[0])
 for each_sub in subs[1:]: 
     str_subs += "_{}".format(each_sub)
 
-print("eyedee    : {}".format(eyedee))
+print("eyedee : {}".format(eyedee))
 
 # CREATING A FOLDER TO STORE THE RESULTS
 crrnt_dir = os.getcwd()
@@ -67,7 +63,7 @@ stim_chans_pre = 1
 
 
 # HELPER FUNCTION TO LOAD DATA FOR SPEECH
-def load_data(blocks=0, filtered="yes"):
+def load_data(blocks=0, filtered=True):
     # IF THE DATA IS ALREADY PROCESSED THROUGH THE FILTERBANK AND PCA
     print('blocks = ' + str(blocks))
     if blocks == num_blocks - 1:
@@ -75,10 +71,10 @@ def load_data(blocks=0, filtered="yes"):
     else:
         val_idx = blocks + 1
 
-    if filtered == "yes":
+    if filtered:
         data_path = 'data1_'+str(blocks)+'.pkl'
         fp = open(data_path, 'rb')
-        data1 = pickle.load(fp)
+        data1 = pkl.load(fp)
         fp.close()
         print("Loaded FILTERED Data.")
 
@@ -92,7 +88,7 @@ def load_data(blocks=0, filtered="yes"):
         # IF THE DATA IS NOT PROCESSED
         data_path = 'data1_pre_'+str(blocks)+'.pkl'
         fp = open(data_path, 'rb')
-        pre_data = pickle.load(fp)
+        pre_data = pkl.load(fp)
         fp.close()
         print("Loaded DEMEANED Data.")
 
@@ -138,7 +134,7 @@ def lcca(stim5_tr, stim5_val, stim5_te, resp5_tr, resp5_val, resp5_te, sub_num, 
     print('LCCA3 is : ' + str(corr_l))
 
     fp = open(path_name + f'lcca_data_sub_{sub_num}_{stim_id}_lin.pkl', 'wb')
-    pickle.dump(new_data_l[1:], fp)
+    pkl.dump(new_data_l[1:], fp)
     fp.close()
     del new_data_l
 
@@ -146,7 +142,7 @@ def lcca(stim5_tr, stim5_val, stim5_te, resp5_tr, resp5_val, resp5_te, sub_num, 
 
 
 
-speech_lcca = "yes"
+speech_lcca = True
 if speech_lcca:
     n_blocks = 20        # IF SPEECH DATA BY LIBERTO ET AL.
     all_corrs = np.zeros((n_blocks, n_subs))
@@ -186,78 +182,7 @@ if speech_lcca:
 
 
 
-# ORIG -> REV -> PHASE -> MEAS_SHUF
-def stim_resp(resp_tr_a, resp_tr_b, resp_val_a, resp_val_b, resp_te_a, resp_te_b, stim_tr_3d, stim_val_3d, stim_te_3d, count):
-    resp_tr = None
-    if resp_tr_a is not None and resp_tr_b is not None:
-        resp_tr = np.concatenate([resp_tr_a[0], resp_tr_b[0]],1)
-        # print(resp_tr.shape)
-        for i in range(1,count):
-            temp    = np.concatenate([resp_tr_a[i], resp_tr_b[i]],1)
-            # print(temp.shape)
-            resp_tr = np.concatenate([resp_tr, temp],1)
-        # print(resp_tr.shape)
-        resp_tr = resp_tr.T
-
-    resp_val = None
-    if resp_val_a is not None and resp_val_b is not None:
-        resp_val = np.concatenate([resp_val_a[0], resp_val_b[0]],1)
-        # print(resp_val.shape)
-        for i in range(1,count):
-            temp    = np.concatenate([resp_val_a[i], resp_val_b[i]],1)
-            # print(temp.shape)
-            resp_val = np.concatenate([resp_val, temp],1)
-        # print(resp_val.shape)
-        resp_val = resp_val.T
-
-    resp_te = None
-    if resp_te_a is not None and resp_te_b is not None:
-        resp_te = np.concatenate([resp_te_a[0], resp_te_b[0]],1)
-        # print(resp_te.shape)
-        for i in range(1,count):
-            temp    = np.concatenate([resp_te_a[i], resp_te_b[i]],1)
-            # print(temp.shape)
-            resp_te = np.concatenate([resp_te, temp],1)
-        # print(resp_te.shape)
-        resp_te = resp_te.T
-
-    stim_tr = None
-    if stim_tr_3d is not None:
-        stim_tr = np.concatenate([stim_tr_3d[0], stim_tr_3d[0]],1)
-        # print(stim_tr.shape)
-        for i in range(1,count):
-            temp    = np.concatenate([stim_tr_3d[i], stim_tr_3d[i]],1)
-            # print(temp.shape)
-            stim_tr = np.concatenate([stim_tr, temp],1)
-        # print(stim_tr.shape)
-        stim_tr = stim_tr.T
-
-    stim_val = None
-    if stim_val_3d is not None:
-        stim_val = np.concatenate([stim_val_3d[0], stim_val_3d[0]],1)
-        # print(stim_val.shape)
-        for i in range(1,count):
-            temp    = np.concatenate([stim_val_3d[i], stim_val_3d[i]],1)
-            # print(temp.shape)
-            stim_val = np.concatenate([stim_val, temp],1)
-        # print(stim_val.shape)
-        stim_val = stim_val.T
-
-    stim_te = None
-    if stim_te_3d is not None:
-        stim_te = np.concatenate([stim_te_3d[0], stim_te_3d[0]],1)
-        # print(stim_te.shape)
-        for i in range(1,count):
-            temp    = np.concatenate([stim_te_3d[i], stim_te_3d[i]],1)
-            # print(temp.shape)
-            stim_te = np.concatenate([stim_te, temp],1)
-        # print(stim_te.shape)
-        stim_te = stim_te.T
-
-    return [stim_tr, stim_val, stim_te], [resp_tr, resp_val, resp_te]
-
-
-nmedh_lcca = "yes"
+nmedh_lcca = True
 if nmedh_lcca:
     fs = 80
     N = 125
