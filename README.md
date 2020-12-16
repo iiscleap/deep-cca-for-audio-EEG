@@ -1,8 +1,12 @@
 # DEEP CCA ANALYSIS FOR AUDIO-EEG DATA
 
-WE HAVE IMPLEMENTED THE PRESENTED CCA METHODS ON TWO DATASETS.
+We have implemented the presented CCA methods on two datasets.
 1. SPEECH - EEG Dataset by Liberto et al.
 2. NMEDH (MUSIC-EEG) Dataset by Kaneshiro et al.
+
+Can be easily extended to any other dataset with a common stimulus for multiple subjects' brain signals.
+
+(Tested for both the linear methods, being tested for deep methods).
 
 From speech dataset, 6 subjects are chosen and experimented on. Each subject has 20 blocks of Audio-EEG data.
 From NMEDH, all subjects were used.
