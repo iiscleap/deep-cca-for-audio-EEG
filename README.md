@@ -4,6 +4,8 @@ We have implemented the presented CCA methods on two datasets.
 1. SPEECH - EEG Dataset by Liberto et al.
 2. NMEDH (MUSIC-EEG) Dataset by Kaneshiro et al.
 
+(Needs some updates)
+
 Can be easily extended to any other dataset with a common stimulus for multiple subjects' brain signals.
 
 (Tested for both the linear methods, being tested for deep methods).
