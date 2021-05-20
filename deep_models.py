@@ -255,10 +255,10 @@ def dcca_model(stim_data, resp_data, o_dim, learning_rate=1e-3, use_all_singular
 # MODEL : dmcca_model_n_resp_1_stim
 # LOSS  : dmcca_model_loss
 # RETURNS : NEW DATA, TRAINING LOSSES, AND THE TRAINED MODEL
-def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False, epoch_num=12, batch_size=2048, reg_par=1e-4, dropout=0.05, best_only=True, lambda_=0.1, path_name="", mid_shape=60, seeds=np.ceil(np.random.rand(10)*100)):
+def dmcca_model(all_data, o_dim, learning_rate=1e-3, use_all_singular_values=False, epoch_num=12, batch_size=2048, reg_par=1e-4, dropout=0.05, best_only=True, lambda_=0.1, path_name="", mid_shape=60, seeds=np.ceil(np.random.rand(10)*100)):
     """
     ARGUMENTS: 
-        DATAS      : AN (N) ELEMENT LIST OF DATA WITH EACH ELEMENT AS: [DATA_i_TRAINING, DATA_i_VALIDATION, DATA_i_TEST]
+        all_data      : AN (N) ELEMENT LIST OF DATA WITH EACH ELEMENT AS: [DATA_i_TRAINING, DATA_i_VALIDATION, DATA_i_TEST]
         ASSUMPTION : 
             THE FIRST (N-1) ELEMENTS ARE THE (N-1) EEG RESPONSES FOR A COMMON STIMULUS.
             THE LAST    1    ELEMENT IS  THE COMMON AUDITORY STIMULUS.
@@ -282,18 +282,18 @@ def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False,
     print('Started multiway DCCA.')
 
     # data = [resp1, resp2, ..., respn, stim]
-    N = len(datas)
+    N = len(all_data)
     
     torch.cuda.empty_cache()
 
-    data_tr  = np.concatenate([i[0] for i in datas], 1)
-    data_val = np.concatenate([i[1] for i in datas], 1)
-    data_te  = np.concatenate([i[2] for i in datas], 1)
+    data_tr  = np.concatenate([i[0] for i in all_data], 1)
+    data_val = np.concatenate([i[1] for i in all_data], 1)
+    data_te  = np.concatenate([i[2] for i in all_data], 1)
 
     data = [data_tr, data_val, data_te]
 
-    i_shape1 =  datas[0][0].shape[1]
-    i_shape2 = datas[-1][0].shape[1]
+    i_shape1 =  all_data[0][0].shape[1]
+    i_shape2 = all_data[-1][0].shape[1]
 
     print(i_shape1)
     print(i_shape2)

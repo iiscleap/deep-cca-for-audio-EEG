@@ -339,12 +339,12 @@ def my_mcca(R, din):
 
     return final_transform, score, each_transform
 
-def linear_mcca(datas, new_chans, o_dim):
+def linear_mcca(all_data, new_chans, o_dim):
     """
      PERFORMING MCCA FOR A SET OF N EEG RESPONSES AND 1 COMMON STIMULUS.
      HERE, STIMULUS IS CONSIDERED FOR THE LMCCA STEP AND NOT USED AFTER THAT.
     ARGUMENTS:
-        datas: AN (N+1) ELEMENTS LIST WITH N EEG RESPONSES AND THE ELEMENT AS THE COMMON STIMULI DATA.
+        all_data: AN (N+1) ELEMENTS LIST WITH N EEG RESPONSES AND THE ELEMENT AS THE COMMON STIMULI DATA.
                ARRANGED AS [DATA_i_TRAINING, DATA_i_VALIDATION, DATA_i_TEST]
     RETURNS:
         lmcca_data : FINAL DATA AFTER PERFORMING THE LMCCA METHOD.
@@ -353,13 +353,13 @@ def linear_mcca(datas, new_chans, o_dim):
         corr          : CORRELATIONS OF THE TEST DATA FROM THE N SUBJECTS AFTER PERFORMING THE LMLC METHOD.
         pre_subs_data : DATA AFTER THE LMCCA MODEL. BEFORE BEING PROCESSED (FILTERED AND PCA) FOR THE LCCA MODEL.
     """
-    n_subs = len(datas)-1
+    n_subs = len(all_data)-1
 
     nchans = 128
-    nsets  = len(datas)
-    resp = datas[:-1]
-    stim = datas[-1]
-    del datas
+    nsets  = len(all_data)
+    resp = all_data[:-1]
+    stim = all_data[-1]
+    del all_data
 
     nchans2 = new_chans; 
     new_data = [[],[],[]] ; W = [None]*n_subs ; meanp = [None]*n_subs 
@@ -504,12 +504,12 @@ def pca_filt_resp(data_sub):
     return new_data_sub
 
 
-def linear_mcca_resps_only(datas, new_chans, o_dim):
+def linear_mcca_resps_only(all_data, new_chans, o_dim):
     """
         LINEAR MCCA WITH ONLY THE N SUBJECTS' EEG RESPONSES.
         THE COMMON STIMULUS IS NOT CONSIDERED FOR THE MCCA STEP.
     ARGUMENTS:
-        datas: AN (N+1) ELEMENTS LIST WITH N EEG RESPONSES AND THE ELEMENT AS THE COMMON STIMULI DATA.
+        all_data: AN (N+1) ELEMENTS LIST WITH N EEG RESPONSES AND THE ELEMENT AS THE COMMON STIMULI DATA.
                ARRANGED AS [DATA_i_TRAINING, DATA_i_VALIDATION, DATA_i_TEST]
     RETURNS:
         lmcca_data : FINAL DATA AFTER PERFORMING THE LMCCA METHOD.
@@ -518,13 +518,13 @@ def linear_mcca_resps_only(datas, new_chans, o_dim):
         corr          : CORRELATIONS OF THE TEST DATA FROM THE N SUBJECTS AFTER PERFORMING THE LMLC METHOD.
         pre_subs_data : DATA AFTER THE LMCCA MODEL. BEFORE BEING PROCESSED (FILTERED AND PCA) FOR THE LCCA MODEL.
     """
-    n_subs = len(datas)-1
+    n_subs = len(all_data)-1
 
     nchans = 128
-    nsets  = len(datas)
-    resp = datas[:-1]
-    stim = datas[-1]
-    del datas
+    nsets  = len(all_data)
+    resp = all_data[:-1]
+    stim = all_data[-1]
+    del all_data
 
     nchans2 = new_chans; 
     new_data = [[],[],[]] ; W = [None]*n_subs ; meanp = [None]*n_subs 
@@ -592,13 +592,13 @@ def linear_mcca_resps_only(datas, new_chans, o_dim):
     print('Linear MCCA corrs are : {}'.format(corr))
     return lmcca_data, lmlc_data, corr, pre_lmdc_data
 
-def linear_mcca_with_stim(datas, new_chans, o_dim):
+def linear_mcca_with_stim(all_data, new_chans, o_dim):
     """
     LINEAR MCCA WITH ONLY THE N SUBJECTS' EEG RESPONSES.
     THE COMMON STIMULUS IS CONSIDERED FOR THE MCCA STEP AND THE OBTAINED TRANSFORMED IS USED FOR THE LATER STEPS TOO.
 
     ARGUMENTS:
-        datas: AN (N+1) ELEMENTS LIST WITH N EEG RESPONSES AND THE ELEMENT AS THE COMMON STIMULI DATA.
+        all_data: AN (N+1) ELEMENTS LIST WITH N EEG RESPONSES AND THE ELEMENT AS THE COMMON STIMULI DATA.
                ARRANGED AS [DATA_i_TRAINING, DATA_i_VALIDATION, DATA_i_TEST]
     RETURNS:
         lmcca_data : FINAL DATA AFTER PERFORMING THE LMCCA METHOD.
@@ -607,13 +607,13 @@ def linear_mcca_with_stim(datas, new_chans, o_dim):
         corr          : CORRELATIONS OF THE TEST DATA FROM THE N SUBJECTS AFTER PERFORMING THE LMLC METHOD.
         pre_subs_data : DATA AFTER THE LMCCA MODEL. BEFORE BEING PROCESSED (FILTERED AND PCA) FOR THE LCCA MODEL.
     """
-    n_subs = len(datas)-1
+    n_subs = len(all_data)-1
 
     nchans = 128
-    nsets  = len(datas)
-    resp = datas[:-1]
-    stim = datas[-1]
-    del datas
+    nsets  = len(all_data)
+    resp = all_data[:-1]
+    stim = all_data[-1]
+    del all_data
 
     nchans2 = new_chans; 
     new_data = [[],[],[]] ; W = [None]*n_subs ; meanp = [None]*n_subs 
