@@ -5,6 +5,7 @@ import sys
 import os
 from os import path
 import scipy.io
+# from pdb import set_trace as bp  #################added break point accessor####################
 
 from cca_functions    import *
 
@@ -17,83 +18,83 @@ stim_chans = 21
 stim_chans_pre = 1
 
 
-# HELPER FUNCTION TO LOAD DATA FOR SPEECH
-def load_data(subs, block=0, filtered=True):
+# HELPER FUNCTION TO LOAD DATA FOR SPEECH for LCCA and DCCA
+def load_data(subs, block=0):
     """
-    THIS IS VALID ONLY FOR THE LIBERTO ET AL. AUDIOBOOK SPEECH DATA. OR DATA SIMILAR TO THAT (WHERE ALL THE SUBJECTS LISTEN TO THE SAME STIMULI).
+    THIS IS VALID FOR THE LIBERTO ET AL. AUDIOBOOK SPEECH DATA. OR DATA SIMILAR TO THAT (WHERE ALL THE SUBJECTS LISTEN TO THE SAME STIMULI).
     ARGUMENTS:
         subs:  IDS OF THE SUBJECTS FOR WHICH LCCA IS TO BE PERFORMED.
         block: OUT OF THE 20 CROSS-FOLD VALIDATION BLOCKS, WHICH BLOCK IS TO BE CHOSEN FOR TESTING. 
                OUT OF THE REMAINING, 18 BLOCKS ARE FOR TRAINING AND 1 FOR VALIDATING.
-        filtered: TO SPECIFY WHETHER THE DATA IS ALREADY PROCESSED AS IN LCCA METHOD OR NOT.
-                IF YES, THE DATA MUST HAD BEEN FILTERED (AND PCA TO 139D, FOR THE STIMULUS) AND ARE READY TO BE SENT TO CCA MODELS.
     
     RETURNS: 
         data_subs: AN (N+1) ELEMENT LIST WITH FIRST N ELEMENTS FOR THE SUBJECTS' DATA AND THE LAST ELEMENT FOR THE COMMON STIMULUS DATA.
     """
-    # IF THE DATA IS ALREADY PROCESSED THROUGH THE FILTERBANK AND PCA
+
     print('block: ' + str(block))
-    if block == num_blocks - 1:
-        val_idx = 0
-    else:
-        val_idx = block + 1
+    if block == num_blocks - 1: val_idx = 0
+    else:                       val_idx = block + 1
 
-    if filtered:
-        # data_path = '/data2/data/dmcca/data/data_'+str(block)+'.pkl'
-        data_path = 'data_'+str(block)+'.pkl' # REPLACE THE DATA PATH HERE
-        fp = open(data_path, 'rb')
-        data1 = pkl.load(fp)
-        fp.close()
-        print("Loaded FILTERED Data.")
+    # LOAD THE prePREPROCESSED DATA HERE 
+    # AND THEN PROCESS IT
+    # data_subs_pre will have N SUBJECTS' RESPONSES SUCH THAT
+    # data_subs_pre[n] = [TRAINING_DATA, VALIDATION_DATA, TESTING_DATA]
+    # WHERE
+    # data_subs_pre[n][j].shape = [Number_of_samples, dimensions]
+    # data_stim_pre IS ALSO PRESENT IN THE SAME WAY AS data_subs_pre[n].
+    # ASSUMPTION: THE STIMULI DATA IS OF 1 DIMENSION.
+    # IF NOT:
+    #    WE CAN either DO PCA ONTO 1D AND THEN DO FILTERBANK.
+    #    or FILTERBANK AND THEN, PCA to 21D.
 
-        print('Data INITIALIZED for block : {}'.format(str(block)))
-        data_subs = []
-        for sub in subs:
-            data_subs.append([data1[0][:,:,sub], data1[1][:,:,sub], data1[2][:,:,sub]])
-        data_subs.append([data1[0][:,:stim_chans,-1], data1[1][:,:stim_chans,-1], data1[2][:,:stim_chans,-1]])
-        del data1
-    else:
-        # IF THE DATA IS NOT PROCESSED
-        data_path = 'data_pre_'+str(block)+'.pkl'  # REPLACE THE DATA PATH HERE
-        fp = open(data_path, 'rb')
-        pre_data = pkl.load(fp)
-        fp.close()
-        print("Loaded DEMEANED Data.")
+    # Each subject's stimulus and response are preprocessed are saved as "Subject{sub}_Preprocessed_ENV_EEG.mat"
+    # The data are processed using "preProcessEEG_Audio_Chevigne_2018.m"
 
-        print('Data INITIALIZED for block : {}'.format(str(block)))
-        data_subs_pre = []
-        for sub in subs:
-            data_subs_pre.append([pre_data[0][:,:,sub], pre_data[1][:,:,sub], pre_data[2][:,:,sub]])
+    folder_path = "/speech_data/" # Path to the data folder here
 
-        data_stim_pre = [pre_data[0][:,:stim_chans_pre,-1], pre_data[1][:,:stim_chans_pre,-1], pre_data[2][:,:stim_chans_pre,-1]]
-        # LOAD THE pre PREPROCESSED DATA HERE 
-        # AND THEN PROCESS IT
-        # data_subs_pre HAS N SUBJECTS' RESPONSES SUCH THAT
-        # data_subs_pre[n] = [TRAINING_DATA, VALIDATION_DATA, TESTING_DATA]
-        # WHERE
-        # data_subs_pre[n][j].shape = [Number_of_samples, dimensions]
-        # data_stim_pre IS ALSO PRESENT IN THE SAME WAY AS data_subs_pre[n].
-        # ASSUMPTION: THE STIMULI DATA IS OF 1 DIMENSION.
-        # IF NOT:
-        # WE CAN either DO PCA ONTO 1D AND THEN DO FILTERBANK.
-        # or FILTERBANK AND THEN, PCA.
+    print('Data INITIALIZING for block : {}'.format(str(block)))
+    data_subs_pre = []
+    for sub in subs:
+        resp_data = scipy.io.loadmat(f"{folder_path}/Subject{sub}_Preprocessed_ENV_EEG.mat")["resp"][0]
 
-        processed_data_subs = []
-        for data_sub in data_subs_pre:
-            processed_data_subs.append(pca_filt_pca_resp(data_sub))
+        # Loading the response data, dividing them into training, validation and test data
         
-        processed_data_subs.append(filtone(data_stim_pre[0], data_stim_pre[1], data_stim_pre[2]))
+        resp_train = np.concatenate([resp_data[x] for x in range(len(resp_data)) if x not in [block, val_idx]], 0)
+        resp_val   = resp_data[val_idx]
+        resp_test  = resp_data[block]
 
-        data_subs = list(processed_data_subs)
-        del processed_data_subs
+        data_subs_pre.append([resp_train, resp_val, resp_test])
+        
+    # Loading the stimulus data, dividing them into training, validation and test data
+    stim_data = scipy.io.loadmat(f"{folder_path}/Subject{sub}_Preprocessed_ENV_EEG.mat")["stim"][0]
+    stim_train = np.concatenate([stim_data[x] for x in range(len(stim_data)) if x not in [block, val_idx]], 0)
+    stim_val   = stim_data[val_idx]
+    stim_test  = stim_data[block]
+
+    data_stim_pre = [stim_train, stim_val, stim_test]
+
+    # processing the response by
+    # PCA to 60D ------> filterbank (21 filters) to 1260D ------> PCA to 139D
+    # processing the stimulus by 
+    # stimulus to filterbank => 21D 
+    #
+    # USED "pca_filt_pca_resp" from cca_functions to perform this 
+    processed_data_subs = []
+    for data_sub in data_subs_pre:
+        processed_data_subs.append(pca_filt_pca_resp(data_sub))
+    
+    processed_data_subs.append(filtone(data_stim_pre[0], data_stim_pre[1], data_stim_pre[2]))
+
+    data_subs = list(processed_data_subs)
+    del processed_data_subs
 
     return data_subs
 
 
-# HELPER FUNCTION TO LOAD DATA FOR SPEECH
+# HELPER FUNCTION TO LOAD DATA FOR SPEECH for LMCCA
 def load_mcca_data(subs, block=0):
     """
-    THIS IS VALID ONLY FOR THE LIBERTO ET AL. AUDIOBOOK SPEECH DATA. OR DATA SIMILAR TO THAT (WHERE ALL THE SUBJECTS LISTEN TO THE SAME STIMULI).
+    THIS IS VALID FOR THE LIBERTO ET AL. AUDIOBOOK SPEECH DATA. OR DATA SIMILAR TO THAT (WHERE ALL THE SUBJECTS LISTEN TO THE SAME STIMULI).
     ARGUMENTS:
         subs:  IDS OF THE SUBJECTS FOR WHICH LCCA IS TO BE PERFORMED.
         block: OUT OF THE 20 CROSS-FOLD VALIDATION BLOCKS, WHICH BLOCK IS TO BE CHOSEN FOR TESTING. 
@@ -102,33 +103,45 @@ def load_mcca_data(subs, block=0):
     RETURNS: 
         data_subs: AN (N+1) ELEMENT LIST WITH FIRST N ELEMENTS FOR THE SUBJECTS' DATA AND THE LAST ELEMENT FOR THE COMMON STIMULUS DATA.
     """
-    # IF THE DATA IS ALREADY PROCESSED THROUGH THE FILTERBANK AND PCA
+
     print('block: ' + str(block))
-    if block == num_blocks - 1:
-        val_idx = 0
-    else:
-        val_idx = block + 1
+    if block == num_blocks - 1: val_idx = 0
+    else:                       val_idx = block + 1
 
-    # IF THE DATA IS NOT PROCESSED
-    data_path = '/data2/jaswanthr/data/dmcca/data/data1_raw_'+str(block)+'.pkl'
-    fp = open(data_path, 'rb')
-    pre_data = pkl.load(fp)
-    fp.close()
-    print("Loaded DEMEANED Data.")
+    # Each subject's stimulus and response are preprocessed are saved as "Subject{sub}_Preprocessed_ENV_EEG.mat"
+    # The data are processed using "preProcessEEG_Audio_Chevigne_2018.m"
 
-    print('Data INITIALIZED for block : {}'.format(str(block)))
+    folder_path = "/speech_data/" # Path to the data folder here
+
+    print('Data INITIALIZING for block : {}'.format(str(block)))
     data_subs_pre = []
     for sub in subs:
-        data_subs_pre.append([pre_data[0][:,:,sub], pre_data[1][:,:,sub], pre_data[2][:,:,sub]])
-    data_subs_pre.append([pre_data[0][:,:stim_chans_pre,-1], pre_data[1][:,:stim_chans_pre,-1], pre_data[2][:,:stim_chans_pre,-1]])
+        resp_data = scipy.io.loadmat(f"{folder_path}/Subject{sub}_Preprocessed_ENV_EEG.mat")["resp"][0]
+        
+        # Loading the response data, dividing them into training, validation and test data
+
+        resp_train = np.concatenate([resp_data[x] for x in range(len(resp_data)) if x not in [block, val_idx]], 0)
+        resp_val   = resp_data[val_idx]
+        resp_test  = resp_data[block]
+
+        data_subs_pre.append([resp_train, resp_val, resp_test])
+
+    # Loading the stimulus data, dividing them into training, validation and test data
+    stim_data = scipy.io.loadmat(f"/data2/jaswanthr/data/Subject{sub}_Preprocessed_ENV_EEG.mat")["stim"][0]
+    stim_train = np.concatenate([stim_data[x] for x in range(len(stim_data)) if x not in [block, val_idx]], 0)
+    stim_val   = stim_data[val_idx]
+    stim_test  = stim_data[block]
+
+    data_stim_pre = [stim_train, stim_val, stim_test]
+    data_subs_pre.append(data_stim_pre)
 
     return data_subs_pre
 
 
-# HELPER FUNCTION TO LOAD DATA FOR SPEECH
+# HELPER FUNCTION TO LOAD DATA FOR SPEECH for DMCCA
 def load_dmcca_data(subs, mid_shape, block=0):
     """
-    THIS IS VALID ONLY FOR THE LIBERTO ET AL. AUDIOBOOK SPEECH DATA. OR DATA SIMILAR TO THAT (WHERE ALL THE SUBJECTS LISTEN TO THE SAME STIMULI).
+    THIS IS VALID FOR THE LIBERTO ET AL. AUDIOBOOK SPEECH DATA. OR DATA SIMILAR TO THAT (WHERE ALL THE SUBJECTS LISTEN TO THE SAME STIMULI).
     ARGUMENTS:
         subs:  IDS OF THE SUBJECTS FOR WHICH LCCA IS TO BE PERFORMED.
         mid_shape : TIME-LAGS APPLIED TO THE STIMLUS
@@ -138,27 +151,37 @@ def load_dmcca_data(subs, mid_shape, block=0):
     RETURNS: 
         data_subs: AN (N+1) ELEMENT LIST WITH FIRST N ELEMENTS FOR THE SUBJECTS' DATA AND THE LAST ELEMENT FOR THE COMMON STIMULUS DATA.
     """
-    # IF THE DATA IS ALREADY PROCESSED THROUGH THE FILTERBANK AND PCA
+    
     print('block: ' + str(block))
-    if block == num_blocks - 1:
-        val_idx = 0
-    else:
-        val_idx = block + 1
+    if block == num_blocks - 1: val_idx = 0
+    else:                       val_idx = block + 1
 
-    # IF THE DATA IS NOT PROCESSED
-    data_path = '/data2/jaswanthr/data/dmcca/data/data1_raw_'+str(block)+'.pkl'
-    fp = open(data_path, 'rb')
-    pre_data = pkl.load(fp)
-    fp.close()
-    print("Loaded DEMEANED Data.")
+    # Each subject's stimulus and response are preprocessed are saved as "Subject{sub}_Preprocessed_ENV_EEG.mat"
+    # The data are processed using "preProcessEEG_Audio_Chevigne_2018.m"
 
-    print('Data INITIALIZED for block : {}'.format(str(block)))
+    folder_path = "/speech_data/" # Path to the data folder here
+
+    print('Data INITIALIZING for block : {}'.format(str(block)))
     data_subs_pre = []
     for sub in subs:
-        data_subs_pre.append([pre_data[0][:,:,sub], pre_data[1][:,:,sub], pre_data[2][:,:,sub]])
-    data_subs_pre.append([pre_data[0][:,:stim_chans_pre,-1], pre_data[1][:,:stim_chans_pre,-1], pre_data[2][:,:stim_chans_pre,-1]])
+        resp_data = scipy.io.loadmat(f"{folder_path}/Subject{sub}_Preprocessed_ENV_EEG.mat")["resp"][0]
+        # Loading the response data, dividing them into training, validation and test data
+        resp_train = np.concatenate([resp_data[x] for x in range(len(resp_data)) if x not in [block, val_idx]], 0)
+        resp_val   = resp_data[val_idx]
+        resp_test  = resp_data[block]
 
+        data_subs_pre.append([resp_train, resp_val, resp_test])
 
+    # Loading the stimulus data, dividing them into training, validation and test data
+    stim_data = scipy.io.loadmat(f"{folder_path}/Subject{sub}_Preprocessed_ENV_EEG.mat")["stim"][0]
+    stim_train = np.concatenate([stim_data[x] for x in range(len(stim_data)) if x not in [block, val_idx]], 0)
+    stim_val   = stim_data[val_idx]
+    stim_test  = stim_data[block]
+
+    data_stim_pre = [stim_train, stim_val, stim_test]
+    data_subs_pre.append(data_stim_pre)
+
+    # Applying stimulus lag (d_S)
     stim_lagged_midshape = [None, None, None]
     for i in range(3):
         stim_lagged_midshape[i] = lagGen(data_subs_pre[-1][i], np.arange(mid_shape))

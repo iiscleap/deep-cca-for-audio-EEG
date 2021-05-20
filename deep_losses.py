@@ -2,9 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+try:  # SciPy >= 0.19
+    from scipy.special import comb, logsumexp
+except ImportError:
+    from scipy.misc import comb, logsumexp  # noqa 
 
-# device = torch.device('cuda')
-# torch.cuda.empty_cache()
+device = torch.device('cuda')
+torch.cuda.empty_cache()
 
 def obj_standardize(x):
     mean_x = torch.mean(x)

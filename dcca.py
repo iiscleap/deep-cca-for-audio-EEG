@@ -9,12 +9,27 @@ import random
 # from pdb import set_trace as bp  #################added break point accessor####################
 # from scipy.signal import lfilter
 
+from pdb import set_trace as bp  #################added break point accessor####################
+from scipy.signal import lfilter
+try:  # SciPy >= 0.19
+    from scipy.special import comb, logsumexp
+except ImportError:
+    from scipy.misc import comb, logsumexp  # noqa 
+
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from   torch.nn import Parameter
+from   torch.utils.data import DataLoader
+
+from deep_nets   import *
+from deep_losses import *
 
 from cca_functions import *
-from speech_helper import load_data
-from music_helper  import stim_resp
-from deep_models   import dcca_model
+from speech_helper import load_new_data
+# from music_helper  import stim_resp
+# from deep_models   import dcca_model
 
 def plot_data(x, y,s):
     plt.clf()
@@ -37,31 +52,35 @@ def plot_losses_tr_val_te(losses, s, marker="o"):
 name_of_the_script = sys.argv[0].split('.')[0]
 a = sys.argv[1:]
 eyedee = str(a[0])  # ID OF THE EXPERIMENT.
-o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
+# o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
+num_blocks_start = int(a[1])
+num_blocks_end = int(a[2])
 
-dropout    = 0.05
+# dropout    = 0.05
 learning_rate = 1e-3
-epoch_num  = 12
-batch_size = 1600
+epoch_num  = 18
+batch_size = 800
 reg_par    = 1e-4
-o_dim      = 1
+o_dim      = 5
 use_all_singular_values = False
 best_only  = True
+
 
 print(f"eyedee    : {eyedee}")
 print(f"best_only : {best_only}")
 print(f"epoch_num : {epoch_num}")
-print(f"dropout   : {dropout}")
+# print(f"dropout   : {dropout}")
 
 device = torch.device('cuda')
+# device = torch.device('cpu')
 torch.cuda.empty_cache()
 
 # CREATING A FOLDER TO STORE THE RESULTS
-path_name = f"{eyedee}_dcca/"
+path_name = f"dcca_{eyedee}_{num_blocks_start}_{num_blocks_end}/"
 
 i = 1
 while path.exists(path_name):
-    path_name = f"{eyedee}_dcca_{i}/"
+    path_name = f"dcca_{eyedee}_{num_blocks_start}_{num_blocks_end}_{i}/"
     i = i + 1
 
 del i
@@ -75,15 +94,7 @@ seed = np.ceil(np.random.rand(1)*100) * np.ones(1)
 print(seed)
 ###############################################
 
-
-
-# NUMBER OF CHANNELS IN THE PROCESSED STIMULI AFTER FILTERBANK
-stim_chans = 21
-# NUMBER OF CHANNELS IN prePREPROCESSED STIMULI (1D)
-stim_chans_pre = 1
-
-
-D = [0, 0.05, 0.1, 0.2]
+D = [0.05, 0.1, 0.2]
 # CAN REPLACE D WITH A SINGLE ELEMENT LIST WHOSE VALUE IS EQUAL TO THE DESIRED DROPOUT.
 
 
@@ -94,6 +105,7 @@ def dcca_method(stim_data, resp_data, dropout, saving_name_root):
     """
     print(f"DCCA for {saving_name_root}")
 
+    # USING dcca_model for DCCA
     new_data_d, correlations, model_d = dcca_model(stim_data, resp_data, o_dim, learning_rate, use_all_singular_values, epoch_num, batch_size, reg_par, dropout, best_only, path_name, seed)
 
     x1 = new_data_d[2][0]
@@ -101,7 +113,7 @@ def dcca_method(stim_data, resp_data, dropout, saving_name_root):
     x3 = new_data_d[1][0]
     x4 = new_data_d[1][1]
     corr_d     = np.squeeze(my_corr(x1, x2, o_dim))
-    corr_d_val = np.squeeze(my_corr(x1, x2, o_dim))
+    corr_d_val = np.squeeze(my_corr(x3, x4, o_dim))
     print(f'DCCA is : {[corr_d, corr_d_val]}')
 
     # PLOTTING THE NEW DATA
@@ -135,7 +147,7 @@ if speech_dcca:
     num_blocks = 20        # IF SPEECH DATA BY LIBERTO ET AL.
 
     # subs ARE THE SUBJECTS IDS TO WORK WITH
-    subs = [None]       # REPLACE WITH THE REQUIRED SUBJECTS' IDS.
+    subs = [11, 13]       # REPLACE WITH THE REQUIRED SUBJECTS' IDS.
     subs = sorted(subs) # TO KEEP THEIR IDS SORTED
     n_subs = len(subs)
 
@@ -143,14 +155,14 @@ if speech_dcca:
     for each_sub in subs[1:]: 
         str_subs += f"_{each_sub}"
 
-    num_blocks_start = 0
-    num_blocks_end   = 1
+    # num_blocks_start = 0
+    # num_blocks_end   = 20
     # CAN CHANGE BOTH VALUES ACCORDING TO THE INTERESTED CROSS-VALIDATION EXPERIMENTS.
     # CAN SUBMIT THESE TWO AS THE ARGUMENTS AND PARSE OVER THERE, FOR BULK EXPERIMENTS.
 
-    all_corrs = np.zeros((num_blocks, len(D), n_subs))
-    all_corrs_name =  f'{path_name}/speech_corrs_{str_subs}.npy'
+    tst_corrs = np.zeros((num_blocks, len(D), n_subs))
     val_corrs = np.zeros((num_blocks, len(D), n_subs))
+    tst_corrs_name =  f'{path_name}/speech_corrs_{str_subs}.npy'
     val_corrs_name =  f'{path_name}/speech_corrs_val_{str_subs}.npy'
 
     print(f"n_subs     : {n_subs}")
@@ -161,8 +173,8 @@ if speech_dcca:
     print(f"num_blocks_end  : {num_blocks_end}")
     print(f"num_blocks_net  : {num_blocks_end - num_blocks_start}")
 
-    for block in range(num_blocks_start, num_blocks_end):
-        for d_cnt, dropout in enumerate(D):
+    for d_cnt, dropout in enumerate(D):
+        for block in range(num_blocks_start, num_blocks_end):
             print(f"block: {block}, subjects: {subs}, dropout : {dropout}")
 
             # data_subs IS A LIST OF N SUBJECTS DATA AND 1 COMMON STIMULUS DATA (AS THE LAST ELEMENT.)
@@ -184,21 +196,23 @@ if speech_dcca:
             for sub in range(n_subs):
                 print(f"Sub: {subs[sub]}")
                 data_subs = pkl.load(open(f"{path_name}/data_subs.pkl", "rb"))
+                # data_sub = pkl.load(open(f"/data2/jaswanthr/data/mcca/all_subs_data/data{subs[sub]}_{block}.pkl", "rb"))["resp"]
+                # data_stim = pkl.load(open(f"/data2/jaswanthr/data/mcca/all_subs_data/data{subs[sub]}_{block}.pkl", "rb"))["stim"]
+
                 data_sub = data_subs[sub]
-                del data_subs
 
                 saving_name_root = f"speech_block_{block}_sub_{subs[sub]}_{dropout}"
                 dcca_corrs[sub], dcca_corrs_val[sub] = dcca_method(data_stim, data_sub, dropout, saving_name_root)
 
                 print(f'DCCA corrs are : {dcca_corrs}')
 
-                all_corrs[block, d_cnt] = dcca_corrs
+                tst_corrs[block, d_cnt] = dcca_corrs
                 val_corrs[block, d_cnt] = dcca_corrs_val
 
-                np.save(all_corrs_name, all_corrs)
+                np.save(tst_corrs_name, tst_corrs)
                 np.save(val_corrs_name, val_corrs)
 
-            print(f'DCCA corrs for {block}, {dropout} are : {all_corrs[block, d_cnt]}')
+            print(f'DCCA corrs for {block}, {dropout} are : {tst_corrs[block, d_cnt]}')
             print(f'saved speech.')
 
 
@@ -206,13 +220,13 @@ if speech_dcca:
 
 
 
-nmedh_dcca = True
+nmedh_dcca = False
 if nmedh_dcca:
     fs = 80
     N = 125
     subs = 58
-    all_corrs = np.zeros((subs, 4, len(D)))
-    all_corrs_name = f'{path_name}/nmedh_corrs.npy'
+    tst_corrs = np.zeros((subs, 4, len(D)))
+    tst_corrs_name = f'{path_name}/nmedh_corrs.npy'
     val_corrs = np.zeros((subs, 4, len(D)))
     val_corrs_name = f'{path_name}/nmedh_corrs_val.npy'
     rm_list = [0, 8, 20, 23, 24, 34, 37, 40, 45, 46, 53]
@@ -297,8 +311,8 @@ if nmedh_dcca:
                 del stimtr, stimval, stimte
 
                 for d_cnt, dropout in enumerate(D):
-                    all_corrs[sub_num-1, stim_id, d_cnt], val_corrs[sub_num-1, stim_id, d_cnt] = dcca_method([stim_tr, stim_val, stim_te], [resp_tr, resp_val, resp_te], dropout,  f"nmedh_sub_{sub_num}_{stim_str}_{dropout}")
-                    np.save(all_corrs_name, all_corrs)
+                    tst_corrs[sub_num-1, stim_id, d_cnt], val_corrs[sub_num-1, stim_id, d_cnt] = dcca_method([stim_tr, stim_val, stim_te], [resp_tr, resp_val, resp_te], dropout,  f"nmedh_sub_{sub_num}_{stim_str}_{dropout}")
+                    np.save(tst_corrs_name, tst_corrs)
                     np.save(val_corrs_name, val_corrs)
 
                 # PC1 -> SPECTRAL FLUX -> RMS
@@ -314,8 +328,8 @@ if nmedh_dcca:
                     stim_tr, stim_val, stim_te = filtone(stimtr, stimval, stimte)
 
                     for d_cnt, dropout in enumerate(D):
-                        all_corrs[sub_num-1, stim_id+1, d_cnt], val_corrs[sub_num-1, stim_id+1, d_cnt] = dcca_method([stim_tr, stim_val, stim_te], [resp_tr, resp_val, resp_te], dropout,  f"nmedh_sub_{sub_num}_{stim_str}_{dropout}")
-                        np.save(all_corrs_name, all_corrs)
+                        tst_corrs[sub_num-1, stim_id+1, d_cnt], val_corrs[sub_num-1, stim_id+1, d_cnt] = dcca_method([stim_tr, stim_val, stim_te], [resp_tr, resp_val, resp_te], dropout,  f"nmedh_sub_{sub_num}_{stim_str}_{dropout}")
+                        np.save(tst_corrs_name, tst_corrs)
                         np.save(val_corrs_name, val_corrs)
 
 
@@ -324,7 +338,7 @@ if nmedh_dcca:
 
 
 
-custom_data = True
+custom_data = False
 if custom_data:
     # TO PERFORM THE LINEAR CCA METHOD ON A CUSTON AUDIO-EEG DATA.
     
@@ -368,16 +382,16 @@ if custom_data:
     del stimtr, stimval, stimte
 
 
-    all_corrs = np.zeros(len(D))
+    tst_corrs = np.zeros(len(D))
     val_corrs = np.zeros(len(D))
-    all_corrs_name = f'{path_name}/corrs.npy'
+    tst_corrs_name = f'{path_name}/corrs.npy'
     val_corrs_name = f'{path_name}/corrs_val.npy'
 
     for d_cnt, dropout in enumerate(D):
         save_name_root = f"custom_{dropout}"
         corrs[d_cnt], corrs_val[d_cnt] = dcca_method([stim_tr, stim_val, stim_te], [resp_tr, resp_val, resp_te], dropout, save_name_root)
 
-        np.save(all_corrs_name, all_corrs)
+        np.save(tst_corrs_name, tst_corrs)
         np.save(val_corrs_name, val_corrs)
 
     print("SAVED.")
@@ -397,3 +411,234 @@ if custom_data:
 
 
 
+
+
+
+
+
+
+
+# IF GIVEN 10 SEEDS, ALL THE MODELS GET ONE FORWARD PASS AND SEED WITH BEST VALIDATION IS SELECTED
+# IF ONLY ONE SEED, THE WEIGHTS ARE INITIALIZED ACCORDINGLY
+# TRAIN AND RETURN THE MODEL
+# MODEL : model2_13
+# LOSS  : cca_loss
+def dcca_model(stim_data, resp_data, o_dim, learning_rate=1e-3, use_all_singular_values=False, epoch_num=12, batch_size=2048, reg_par=1e-4, dropout=0.05, best_only=True, path_name="", seeds=np.ceil(np.random.rand(10)*100)):
+    """
+    ARGUMENTS: 
+        stim_data  : A THREE ELEMENT LIST OF STIMULI  DATA ARRANGED AS: [STIM_TRAINING, STIM_VALIDATION, STIM_TEST]
+        resp_data  : A THREE ELEMENT LIST OF RESPONSE DATA ARRANGED AS: [RESP_TRAINING, RESP_VALIDATION, RESP_TEST]
+        learning_rate : LEARNING RATE OF THE MODEL (DEFAULT: 1e-3)
+        use_all_singular_values : WHETHER THE MODEL SHOULD USE ALL THE SINGULAR VALUES IN THE CCA LOSS (DEFAULT: False)
+        epoch_num  : NUMBER OF EPOCHS OF TRAINING (DEFAULT: 12)
+        batch_size : MINIBATCH SIZES FOR TRAINING THE MODEL (DEFAULT: 2048)
+        reg_par    : REGULARIZATION PARAMETER FOR WEIGHT DECAY (DEFAULT: 1e-4)
+        dropout    : DROPOUTS PERCENTAGE IN THE MODEL (DEFAULT: 0.05)
+        best_only  : SAVE THE MODEL ONLY WITH THE BEST VALIDATION LOSS (DEFAULT: True)
+        path_name  : WHERE THE MODEL IS TO BE SAVED. (DEFAULT: "")
+        seeds      : SEED FOR THE DEEP MODEL. If given one seed, the model will be initialized with that seed.  
+                     IF given more than one seed, the seed with best val loss is selected.
+    
+    RETURNS:
+        new_data      : NEW REPRESENTATIONS AFTER PERFORMING DEEP CCA
+        correlations  : THE TRAINING, VALIDATION AND TEST SET LOSSES WHILE TRAINING THE MODEL - TO TRACK THE MODEL AS TRAINING PROGRESSED.
+        model         : THE TRAINED MODEL.
+    """
+
+    stimtr  = stim_data[0]
+    stimval = stim_data[1]
+    stimte  = stim_data[2]
+    resptr  = resp_data[0]
+    respval = resp_data[1]
+    respte  = resp_data[2]
+
+    # stimtr, mean1, std1 = my_standardize(stimtr)
+    # resptr, mean2, std2 = my_standardize(resptr)
+
+    # stimval = (stimval - mean1) / std1
+    # stimte  = (stimte  - mean1) / std1
+    # respval = (respval - mean2) / std2
+    # respte  = (respte  - mean2) / std2
+
+    resp_tr  = torch.from_numpy(resptr ).float()
+    resp_val = torch.from_numpy(respval).float()
+    resp_te  = torch.from_numpy(respte ).float()
+
+    stim_tr  = torch.from_numpy(stimtr ).float();        
+    stim_val = torch.from_numpy(stimval).float();      
+    stim_te  = torch.from_numpy(stimte ).float();        
+
+    data_tr  = torch.cat([resp_tr,  stim_tr ], 1)
+    data_val = torch.cat([resp_val, stim_val], 1)
+    data_te  = torch.cat([resp_te,  stim_te ], 1)
+
+    i_shape1 = resp_tr.shape[1]
+    i_shape2 = stim_tr.shape[1]
+
+    # best_only = True
+    act = "sigmoid"
+    o_act = 'leaky_relu'
+
+    if (isinstance(seeds, int)): seed = seeds
+    elif not(isinstance(seeds, int)) and len(seeds) == 1: seed = seeds[0]
+    else:
+        torch.backends.cudnn.deterministic = True
+        first_and_last = np.zeros((len(seeds),3))
+        models = [None] * len(seeds)
+        print('seeds: ', seeds)
+
+        for seed_num, seed in enumerate(seeds) : 
+            torch.manual_seed(seed)
+            if torch.cuda.is_available() : torch.cuda.manual_seed_all(seed)
+            
+            num_layers = 2
+            h_size     = 512
+
+            model = LSTM_13(num_layers, i_shape1, i_shape2, h_size, o_dim)
+            # model = model2_13(i_shape1, i_shape2, act, o_act, o_dim, dropout)
+            model = model.to(device)
+            model_optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=reg_par)
+
+            print('MODEL : {}'.format(seed_num))
+
+            model.eval()
+            torch.cuda.empty_cache()
+
+            tr_loss = 0 ; count = 0
+            # dataloader = DataLoader(data_tr, batch_size, shuffle=True)
+            dataloader = DataLoader(data_tr, batch_size, shuffle=False)
+            with torch.no_grad():
+                for trs in dataloader : 
+                    trs = trs.to(device)
+                    outputs = model(trs)
+                    loss = cca_loss(outputs, o_dim, use_all_singular_values)
+                    tr_loss = tr_loss + loss
+                    count = count + 1
+                    del trs
+            tr_loss = tr_loss / count
+            
+            data_val = data_val.to(device)
+            val_ops = model(data_val)
+            val_loss = cca_loss(val_ops, o_dim, use_all_singular_values)
+            data_val = data_val.cpu()
+            torch.cuda.empty_cache()
+            
+            data_te = data_te.to(device)
+            test_ops = model(data_te)
+            test_loss = cca_loss(test_ops, o_dim, use_all_singular_values)
+            data_te = data_te.cpu()
+            torch.cuda.empty_cache()
+
+            models[seed_num] = model
+            first_and_last[seed_num] = [-tr_loss, -val_loss, -test_loss]
+            print('{:0.4f} {:0.4f} {:0.4f}'.format(-tr_loss, -val_loss, -test_loss))
+
+        np.set_printoptions(precision=4)
+        idx = np.argsort(-first_and_last[:,1])
+        print(first_and_last[idx,1:])
+        print(seeds[idx])
+        seed = seeds[idx[0]]
+
+    print("seed:    ", seed   )
+
+    torch.manual_seed(seed)
+    if torch.cuda.is_available() : torch.cuda.manual_seed_all(seed)
+    model = model2_13(i_shape1, i_shape2, act, o_act, o_dim, dropout)
+    model = model.to(device)
+    model_optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=reg_par)
+
+    model_state_dict = []
+    min_loss = 0.00 ; min_loss2 = 0.00
+    correlations = np.zeros((epoch_num, 3))
+    for epoch in range(epoch_num):  # loop over the dataset multiple times
+        model.train()
+        # dataloader = DataLoader(data_tr, batch_size, shuffle=True)
+        dataloader = DataLoader(data_tr, batch_size, shuffle=False)
+        for trs in dataloader : 
+            model_optimizer.zero_grad()
+            trs = trs.to(device)
+            outputs = model(trs)
+            loss = cca_loss(outputs, o_dim, use_all_singular_values)
+            loss.backward()
+            model_optimizer.step()
+            del trs
+        
+        model.eval()
+        torch.cuda.empty_cache()
+        tr_loss = 0
+        count = 0
+        # dataloader = DataLoader(data_tr, batch_size, shuffle=True)
+        dataloader = DataLoader(data_tr, batch_size, shuffle=False)
+        with torch.no_grad():
+            for trs in dataloader :
+                trs = trs.to(device)
+                outputs = model(trs)
+                loss = cca_loss(outputs, o_dim, use_all_singular_values)
+                loss = loss.item()
+                tr_loss = tr_loss + loss
+                count = count + 1
+                del trs
+        correlations[epoch, 0] = -tr_loss / (count)
+        torch.cuda.empty_cache()
+
+        print('EPOCH : {}'.format(epoch))
+        print('  Training CORRELATION   : {:0.4f}'.format(correlations[epoch, 0]))
+
+        data_val = data_val.to(device)
+        val_ops = model(data_val)
+        val_loss = cca_loss(val_ops, o_dim, use_all_singular_values)
+        correlations[epoch, 1] = -val_loss
+        data_val = data_val.cpu()
+        torch.cuda.empty_cache()
+        print('  Validation CORRELATION : {:0.4f}'.format(-val_loss))
+        
+        data_te = data_te.to(device)
+        test_ops = model(data_te)
+        test_loss = cca_loss(test_ops, o_dim, use_all_singular_values)
+        correlations[epoch, 2] = -test_loss
+        data_te = data_te.cpu()
+        torch.cuda.empty_cache()
+        print('  Test CORRELATION       : {:0.4f}'.format(-test_loss))
+
+        print("  val. loss is : {:0.4f} & the min. loss is : {:0.4f}".format(val_loss, min_loss))
+        print("  AND since, val_loss < min_loss is {}".format(val_loss < min_loss))
+
+        if val_loss < min_loss2:
+            min_loss2 = val_loss
+
+        model_file_name = path_name + '/best_model.pth'
+
+        if best_only == True:
+            if val_loss < min_loss or epoch == 0:
+                torch.save({
+                            'epoch' : epoch,
+                            'model_state_dict' : model.state_dict(),
+                            'optimizer_state_dict': model_optimizer.state_dict(),
+                            'loss': loss}, model_file_name)
+                print('  Saved the model at epoch : {}\n'.format(epoch))
+                min_loss = val_loss
+            else:
+                if epoch != 0:
+                    checkpoint = torch.load(model_file_name)
+                    model.load_state_dict(checkpoint['model_state_dict'])
+                    model_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                    best_epoch = checkpoint['epoch']
+                    # loss = checkpoint['loss']
+                    print('  Loaded the model from epoch : {}.\n'.format(best_epoch))
+                    model.train()
+
+    model.eval()
+    data2 = [data_tr, data_val, data_te]
+    with torch.no_grad():
+        new_data = []
+        for k in range(3):
+            temp = data2[k].to(device)
+            pred_out = model(temp)
+            new_data.append([pred_out[0].cpu().numpy(), pred_out[1].cpu().numpy()])
+
+    # x1 = new_data[2][0]
+    # x2 = new_data[2][1]
+    # result = np.squeeze(my_corr(x1, x2, o_dim))
+    # print(result)
+
+    return new_data, correlations, model

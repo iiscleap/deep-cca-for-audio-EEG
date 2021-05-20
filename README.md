@@ -1,16 +1,12 @@
 # DEEP CCA ANALYSIS FOR AUDIO-EEG DATA
 
-We have implemented the presented CCA methods on two datasets.
-1. SPEECH - EEG Dataset by Liberto et al.
-2. NMEDH (MUSIC-EEG) Dataset by Kaneshiro et al.
+update 1:
 
-(Needs some updates)
+WE HAVE IMPLEMENTED THE PRESENTED CCA METHODS ON TWO DATASETS.
+1. SPEECH            - EEG Dataset by Liberto et al.
+2. NMEDH (MUSIC-EEG) - EEG Dataset by Kaneshiro et al.
 
-Can be easily extended to any other dataset with a common stimulus for multiple subjects' brain signals.
-
-(Tested for both the linear methods, being tested for deep methods).
-
-From speech dataset, 6 subjects are chosen and experimented on. Each subject has 20 blocks of Audio-EEG data.
+From speech dataset, 8 subjects are chosen and experimented on. Each subject has 20 blocks of Audio-EEG data.
 From NMEDH, all subjects were used.
 
 ## WHAT DO WE HAVE HERE?
@@ -24,17 +20,17 @@ Codes for performing four CCA methods on audio-EEG datasets.
 All of our methods are performed on presaved data as follows.
 
 ### Speech Dataset
-1. We have chosen 6 subjects from the dataset.
+1. We have chosen 8 subjects from the dataset.
 2. Preprocessed the EEG and the common stimuli as mentioned by Alain de Cheviegné et al.
-3. Saved the 20 cross-fold validation data of all subjects' EEG Recordings and common stimuli as f"data_raw_{block}.pkl".
-   1. It contains a list of 7 elements. 6 subject's EEG as first six elements and the last element as the common stimuli.
+3. Saved the 20 cross-fold validation data of all subjects' EEG Recordings and common stimuli.
+   1. It contains a list of 9 elements. 8 subject's EEG as first six elements and the last element as the common stimuli.
    2. Each element is a list of 3 elements. [Training_data, Validation data, Test_data]. Training_data has 18 blocks, Validation_data has 1 block and Test_data has 1 block.
    3. Each of these lists' elements are in the shape: Time-length x Dimen
    4. sion
    5. Dimension = 128D for EEG and 1D for the preprocessed Auditory Envelope.
 4. Processed the EEG and stimuli using PCA and filterbank as proposed for LCCA3 method by Cheviegné et al.
-5. Saved these 20 cross-fold validation data also similar to the preprocessed data. Saved as f"data_{block}.pkl".
-   1. It contains a list of 7 elements. 6 subject's EEG as first six elements and the last element as the common stimuli.
+5. Saved these 20 cross-fold validation data also similar to the preprocessed data.
+   1. It contains a list of 9 elements. 8 subject's EEG as first six elements and the last element as the common stimuli.
    2. Each element is a list of 3 elements. [Training_data, Validation data, Test_data]. Training_data has 18 blocks, Validation_data has 1 block and Test_data has 1 block.
    3. Each of these lists' elements are in the shape: Time-length x Dimension
    4. Dimension = 139D for EEG and 21D for the preprocessed Auditory Envelope.

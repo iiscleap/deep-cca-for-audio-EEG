@@ -11,9 +11,9 @@ import random
 import torch 
 
 from cca_functions  import *
-from speech_helper  import load_mcca_data
+from speech_helper  import load_dmcca_data
 from music_helper   import stim_resp
-from deep_models    import dcca_model
+from deep_models    import dcca_model, dmcca_model
 
 def plot_data(x, y,s):
     plt.clf()
@@ -36,37 +36,41 @@ def plot_losses_tr_val_te(losses, s, marker="o"):
 name_of_the_script = sys.argv[0].split('.')[0]
 a = sys.argv[1:]
 eyedee = str(a[0])  # ID OF THE EXPERIMENT.
-o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
+# o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
+num_blocks_start = int(a[1])
+num_blocks_end   = int(a[2])
+lambda_          = float(a[3])
+mid_shape        = int(a[4])
+D                = [float(x) for x in a[5:]]
 
-dropout    = 0.05
+# dropout    = 0.05
 learning_rate = 1e-3
-epoch_num  = 12
-batch_size = 1600
+epoch_num  = 20
+batch_size = 800
 reg_par    = 1e-4
 o_dim      = 1
 use_all_singular_values = False
 best_only  = True
 
-
 print(f"eyedee    : {eyedee}")
 print(f"best_only : {best_only}")
 print(f"epoch_num : {epoch_num}")
-print(f"dropout   : {dropout}")
+# print(f"dropout   : {dropout}")
 
 device = torch.device('cuda')
 torch.cuda.empty_cache()
 
 # CREATING A FOLDER TO STORE THE RESULTS
-path_name = f"{eyedee}_dmcca/"
+path_name = f"dmcca_{eyedee}_{num_blocks_start}_{num_blocks_end}_{lambda_}_{mid_shape}_{D[0]}/"
 
 i = 1
 while path.exists(path_name):
-    path_name = f"{eyedee}_dmcca_{i}/"
+    path_name = f"dmcca_{eyedee}_{num_blocks_start}_{num_blocks_end}_{lambda_}_{mid_shape}_{D[0]}_{i}/"
     i = i + 1
 
 del i
 os.mkdir(path_name)
-# print(path_name)
+print(path_name)
 
 
 ##################### SEED #####################
@@ -75,23 +79,16 @@ seed = np.ceil(np.random.rand(1)*100) * np.ones(1)
 print(seed)
 ###############################################
 
-
-# NUMBER OF CHANNELS IN THE PROCESSED STIMULI AFTER FILTERBANK
-stim_chans = 21
-# NUMBER OF CHANNELS IN prePREPROCESSED STIMULI (1D)
-stim_chans_pre = 1
-
-pca_chans = 40
-
-D = [0, 0.05, 0.1, 0.2]
+# D = [0, 0.05, 0.1, 0.2]
+# D = [0.05, 0.2]
 # CAN REPLACE D WITH A SINGLE ELEMENT LIST WHOSE VALUE IS EQUAL TO THE DESIRED DROPOUT.
 
 # COEFFICIENT TO THE MSE REGULARIZATION LOSS OF THE DECODER
-beta       = 0.1
+# lambda_       = 0.1
 
 # MIDDLE LAYER UNITS IN THE DMCCA ARCHITECTURE
 # IS ALSO THE TIME-LAGS APPLIED TO THE STIMULUS
-mid_shape  = 60
+# mid_shape  = 60
 
 # HELPER FUNCTION FOR PERFORMING DCCA
 def dcca_method(stim_data, resp_data, dropout, dataset, saving_name_root):
@@ -134,12 +131,12 @@ def dcca_method(stim_data, resp_data, dropout, dataset, saving_name_root):
     return [corr_d, corr_d_val]
 
 
-# HELPER FUNCTION FOR PERFORMING DCCA
+# HELPER FUNCTION FOR PERFORMING LCCA
 def lcca_method(stim_data, resp_data, dataset, saving_name_root):
     """
-    CUSTOM DCCA METHOD
+    CUSTOM LCCA METHOD
     """
-    print(f"DCCA for {saving_name_root}")
+    print(f"LCCA for {saving_name_root}")
 
     _, new_data_l = cca_model(stim_data, resp_data, o_dim)
     x1 = new_data_l[2][0] ; x3 = new_data_l[1][0]
@@ -158,16 +155,17 @@ def lcca_method(stim_data, resp_data, dataset, saving_name_root):
     return corr_l[0], corr_l[1]
 
 
-
-def dmcca_method(datas, dataset, saving_name_root):
-    dmcca_data, training_losses, dmcca_model = dmcca_model(datas, o_dim, learning_rate, use_all_singular_values, epoch_num, batch_size, reg_par, dropout, best_only, beta, path_name, mid_shape, seed)
+def dmcca_method(all_data, dataset, dropout, saving_name_root):
+    o_dim = 10
+    # providing the data to DMCCA model
+    dmcca_data, training_losses, dmcca_model_ = dmcca_model(all_data, o_dim, learning_rate, use_all_singular_values, epoch_num, batch_size, reg_par, dropout, best_only, lambda_, path_name, mid_shape, seed)
 
     # SAVING THE DMCCA MODEL
     save_model_name = f"{path_name}/{dataset}_dmcca_model_{saving_name_root}.path.tar"
-    torch.save(dmcca_model, save_model_name)
+    torch.save(dmcca_model_, save_model_name)
     # save_dict_name = f"{path_name}/{dataset}_dmcca_dict_{saving_name_root}.pth.tar"
     # torch.save({'state_dict': dmcca_model.state_dict()}, save_dict_name)
-    del dmcca_model
+    del dmcca_model_
 
     # TO MAKE SURE EVERYTHING IS in CPU and NUMPY
     for gg in range(3):
@@ -185,7 +183,7 @@ def dmcca_method(datas, dataset, saving_name_root):
     fp.close()
     del new_dmcca_data
 
-    n_subs = len(datas) - 1
+    n_subs = len(all_data) - 1
 
     dmdc_corrs     = np.zeros((n_subs))
     dmdc_corrs_val = np.zeros((n_subs))
@@ -193,7 +191,7 @@ def dmcca_method(datas, dataset, saving_name_root):
     dmlc_corrs     = np.zeros((n_subs))
     dmlc_corrs_val = np.zeros((n_subs))
 
-    for sub in range(n_subs):
+    for sub in range(6, n_subs):
         print(f"Sub: {subs[sub]}")
 
         data_subs = pkl.load(open(f'{path_name}/{dataset}_dmcca_data_{saving_name_root}.pkl', 'rb'))
@@ -212,8 +210,10 @@ def dmcca_method(datas, dataset, saving_name_root):
         dmdc_corrs[sub], dmdc_corrs_val[sub] = dcca_method(data_stim, data_sub, dropout, dataset, f"{saving_name_root}_sub_{sub}")
 
         print(f'DMDC corrs are : {dmdc_corrs}')
+    
+    os.remove(f'{path_name}/{dataset}_dmcca_data_{saving_name_root}.pkl')
 
-    print(f'DONE {dataset} - {saving_data_name}.')
+    print(f'DONE {dataset} - {saving_name_root}.')
     return [dmlc_corrs, dmlc_corrs_val], [dmdc_corrs, dmdc_corrs_val]
 
 
@@ -233,14 +233,14 @@ if speech_dmcca:
     for each_sub in subs[1:]: 
         str_subs += f"_{each_sub}"
 
-    num_blocks_start = 0
-    num_blocks_end   = 1
+    # num_blocks_start = 0
+    # num_blocks_end   = 1
     # CAN CHANGE BOTH VALUES ACCORDING TO THE INTERESTED CROSS-VALIDATION EXPERIMENTS.
     # CAN SUBMIT THESE TWO AS THE ARGUMENTS AND PARSE OVER THERE, FOR BULK EXPERIMENTS.
 
-    all_corrs = np.zeros((2, num_blocks, len(D), n_subs))
-    all_corrs_name =  f'{path_name}/speech_corrs_{str_subs}.npy'
+    tst_corrs = np.zeros((2, num_blocks, len(D), n_subs))
     val_corrs = np.zeros((2, num_blocks, len(D), n_subs))
+    tst_corrs_name =  f'{path_name}/speech_corrs_{str_subs}.npy'
     val_corrs_name =  f'{path_name}/speech_corrs_val_{str_subs}.npy'
 
     print(f"n_subs     : {n_subs}")
@@ -251,46 +251,45 @@ if speech_dmcca:
     print(f"num_blocks_end  : {num_blocks_end}")
     print(f"num_blocks_net  : {num_blocks_end - num_blocks_start}")
 
-    for block in range(num_blocks_start, num_blocks_end):
-        # THE DATA data_subs_pre IS LOADED SUCH THAT 
-        # ALL THE N EEG RESPONSES ARE LOADED IN THE FIRST N LISTS
-        # AND THE LAST LIST HAS STIMULUS
-        # data_subs_pre IS A list OF SIZE N+1
-        # EACH ELEMENT IS A list OF SIZE 3
-        # SUCH THAT
-        # data_subs_pre[n] = [TRAINING_DATA, VALIDATION_DATA, TESTING_DATA]
-        # AND
-        # data_subs_pre[n][j].shape = [Number_of_samples, dimensions]
-        data_subs_pre = load_dmcca_data(subs, mid_shape, block)
+    for d_cnt, dropout in enumerate(D):
+        for block in range(num_blocks_start, num_blocks_end):
+            # THE DATA data_subs_pre IS LOADED SUCH THAT 
+            # ALL THE N EEG RESPONSES ARE LOADED IN THE FIRST N LISTS
+            # AND THE LAST LIST HAS STIMULUS
+            # data_subs_pre IS A list OF SIZE N+1
+            # EACH ELEMENT IS A list OF SIZE 3
+            # SUCH THAT
+            # data_subs_pre[n] = [TRAINING_DATA, VALIDATION_DATA, TESTING_DATA]
+            # AND
+            # data_subs_pre[n][j].shape = [Number_of_samples, dimensions]
+            data_subs_pre = load_dmcca_data(subs, mid_shape, block)
 
-        ## DEEP MCCA
-        print("DEEP MCCA + LCCA")
+            ## DEEP MCCA
+            print("DEEP MCCA + LCCA")
 
-        dmlcs, dmdcs = dmcca_method(data_subs_pre, "speech", f"block_{block}_drpt_{dropout}")
+            dmlcs, dmdcs = dmcca_method(data_subs_pre, "speech", dropout, f"block_{block}_drpt_{dropout}")
 
-        all_corrs[0, block, d_cnt] = dmlcs[0]
-        all_corrs[1, block, d_cnt] = dmdcs[0]
+            tst_corrs[0, block, d_cnt] = dmlcs[0]
+            tst_corrs[1, block, d_cnt] = dmdcs[0]
 
-        val_corrs[0, block, d_cnt] = dmlcs[1]
-        val_corrs[1, block, d_cnt] = dmdcs[1]
+            val_corrs[0, block, d_cnt] = dmlcs[1]
+            val_corrs[1, block, d_cnt] = dmdcs[1]
 
-        np.save(all_corrs_name, all_corrs)
-        np.save(val_corrs_name, val_corrs)
+            np.save(tst_corrs_name, tst_corrs)
+            np.save(val_corrs_name, val_corrs)
 
-        print('saved SPEECH')
+            print('saved SPEECH')
 
 
-nmedh_dmcca = True
+nmedh_dmcca = False
 if nmedh_dmcca:
     # subs ARE THE SUBJECTS IDS TO WORK WITH
-    # FOR THE LMCCA DENOISING STEP.
-    pca_chans = 40
     
     # THE 4 STIMULI FEATURES ARE ORDERED AS:
     # ENV -> PCA1 -> FLUX -> RMS
-    all_corrs = np.zeros((2, 4, len(D), 16, 12))
+    tst_corrs = np.zeros((2, 4, len(D), 16, 12))
     val_corrs = np.zeros((2, 4, len(D), 16, 12))
-    all_corrs_name = f'{path_name}/nmedh_corrs.npy'
+    tst_corrs_name = f'{path_name}/nmedh_corrs.npy'
     val_corrs_name = f'{path_name}/nmedh_corrs_val.npy'
 
     stims = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
@@ -300,9 +299,9 @@ if nmedh_dmcca:
         for stim_num, stim__ in enumerate(stims):
 
             print(f"Stimulus Feature: {stim_str}, Stimulus Number : {stim__}")
-            lmc_corrs = np.zeros(all_corrs.shape[1])
+            lmc_corrs = np.zeros(tst_corrs.shape[1])
             # data_path = '/data2/data/nmed-h/stim_data2/'
-            data_path = # LOAD YOUR DATA PATH HERE
+            data_path = None # LOAD YOUR DATA PATH HERE
 
             # LOAD DATA
 
@@ -322,22 +321,22 @@ if nmedh_dmcca:
             # EACH STIMULI FEATURE IS IN THE SHAPE T x 1
 
             mcca_data = pkl.load(open(f"{data_path}/mcca_{stim__}.pkl", "rb"))
-            datas = mcca_data[0]
+            all_data = mcca_data[0]
             stim_data = [mcca_data[1][0][:,stim_id].reshape(-1,1), mcca_data[1][1][:,stim_id].reshape(-1,1), mcca_data[1][2][:,stim_id].reshape(-1,1)]
 
-            datas.append(stim_data)
+            all_data.append(stim_data)
 
             for d_cnt, dropout in enumerate(D):
 
                 dmlcs, dmdcs = dmcca_method(data_subs_pre, "music", f"{stim_str}_{stim__}_drpt_{dropout}")
 
-                all_corrs[0, stim_id, stim_num] = dmlcs[0]
-                all_corrs[1, stim_id, stim_num] = dmdcs[0]
+                tst_corrs[0, stim_id, stim_num] = dmlcs[0]
+                tst_corrs[1, stim_id, stim_num] = dmdcs[0]
 
                 val_corrs[0, stim_id, stim_num] = dmlcs[1]
                 val_corrs[1, stim_id, stim_num] = dmdcs[1]
 
-                np.save(all_corrs_name, all_corrs)
+                np.save(tst_corrs_name, tst_corrs)
                 np.save(val_corrs_name, val_corrs)
 
     print(f'saved music.')
@@ -346,13 +345,17 @@ if nmedh_dmcca:
 
 
 # FOR CUSTOM,
-# ONE CAN REPLACE THE datas LIST WITH THE INTERESTED DATASET.
-# DATAS IN A LIST OF N+1 ITEMS
+# ONE CAN REPLACE THE all_data LIST WITH THE INTERESTED DATASET.
+# all_data IS A LIST OF N+1 ITEMS
 # FIRST N ITEMS BELONG TO EEG RECORDINGS OF N SUBJECTS RESPECTIVELY.
 # LAST  1 ITEM BELONGS TO THE COMMON STIMULI PROVIDED TO ALL THE SUBJECTS
 # EACH ITEM OF THE (N+1) LENGTH LIST IS ARRANGED AS 
 # [TRAINING_DATA, VALIDATION_DATA, TEST_DATA]
 # EACH OF THESE DATA ARE IN THE SHAPE : NUMBER OF SAMPLES X VECTOR DIMENSION OF EACH SAMPLE
 #
-# AFTER LOADING THE DATA INTO datas,
+# AFTER LOADING THE DATA INTO all_data,
 # ONE CAN CALL THE dmcca_method FUNCTION ON IT
+# Then process the data through PCA and filterbank
+# Then provide the data to LCCA or DCCA models to obtain final representations
+
+

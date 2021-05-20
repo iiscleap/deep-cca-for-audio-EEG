@@ -44,11 +44,12 @@ def dcca_model(stim_data, resp_data, o_dim, learning_rate=1e-3, use_all_singular
         dropout    : DROPOUTS PERCENTAGE IN THE MODEL (DEFAULT: 0.05)
         best_only  : SAVE THE MODEL ONLY WITH THE BEST VALIDATION LOSS (DEFAULT: True)
         path_name  : WHERE THE MODEL IS TO BE SAVED. (DEFAULT: "")
-        seeds      : SEED FOR THE DEEP MODEL. (DEFAULT: 10 RANDOM SEEDS)
+        seeds      : SEED FOR THE DEEP MODEL. If given one seed, the model will be initialized with that seed.  
+                     IF given more than one seed, the seed with best val loss is selected.
     
     RETURNS:
         new_data      : NEW REPRESENTATIONS AFTER PERFORMING DEEP CCA
-        correlations  : THE TRAINING, VALIDATION AND TEST SET LOSSES WHILE TRAINING THE MODEL - TO UNDERSTAND HOW THE MODEL BEHAVED AS TRAINING PROGRESSED.
+        correlations  : THE TRAINING, VALIDATION AND TEST SET LOSSES WHILE TRAINING THE MODEL - TO TRACK THE MODEL AS TRAINING PROGRESSED.
         model         : THE TRAINED MODEL.
     """
 
@@ -247,7 +248,6 @@ def dcca_model(stim_data, resp_data, o_dim, learning_rate=1e-3, use_all_singular
 
 
 
-
 # DMCCA MODEL WITH N RESPS AND 1 STIM
 # IF GIVEN 10 SEEDS, ALL THE MODELS GET ONE FORWARD PASS AND SEED WITH BEST VALIDATION IS SELECTED
 # IF ONLY ONE SEED, THE WEIGHTS ARE INITIALIZED ACCORDINGLY
@@ -255,7 +255,7 @@ def dcca_model(stim_data, resp_data, o_dim, learning_rate=1e-3, use_all_singular
 # MODEL : dmcca_model_n_resp_1_stim
 # LOSS  : dmcca_model_loss
 # RETURNS : NEW DATA, TRAINING LOSSES, AND THE TRAINED MODEL
-def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False, epoch_num=12, batch_size=2048, reg_par=1e-4, dropout=0.05, best_only=True, beta=0.1, path_name="", mid_shape=60, seeds=np.ceil(np.random.rand(10)*100)):
+def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False, epoch_num=12, batch_size=2048, reg_par=1e-4, dropout=0.05, best_only=True, lambda_=0.1, path_name="", mid_shape=60, seeds=np.ceil(np.random.rand(10)*100)):
     """
     ARGUMENTS: 
         DATAS      : AN (N) ELEMENT LIST OF DATA WITH EACH ELEMENT AS: [DATA_i_TRAINING, DATA_i_VALIDATION, DATA_i_TEST]
@@ -270,14 +270,14 @@ def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False,
         reg_par    : REGULARIZATION PARAMETER FOR WEIGHT DECAY (DEFAULT: 1e-4)
         dropout    : DROPOUTS PERCENTAGE IN THE MODEL (DEFAULT: 0.05)
         best_only  : SAVE THE MODEL ONLY WITH THE BEST VALIDATION LOSS (DEFAULT: True)
-        beta       : MSE REGULARIZATION PARAMETER
+        lambda_       : MSE REGULARIZATION PARAMETER
         path_name  : WHERE THE MODEL IS TO BE SAVED. (DEFAULT: "")
         seeds      : SEED FOR THE DEEP MODEL. (DEFAULT: 10 RANDOM SEEDS)
     
     RETURNS:
-        new_data      : NEW REPRESENTATIONS AFTER PERFORMING DEEP CCA
-        training_losses  : THE TRAINING, VALIDATION AND TEST SET LOSSES WHILE TRAINING THE MODEL - TO UNDERSTAND HOW THE MODEL BEHAVED AS TRAINING PROGRESSED.
-        model         : THE TRAINED MODEL.
+        new_data         : NEW REPRESENTATIONS AFTER PERFORMING DEEP CCA
+        training_losses  : THE TRAINING, VALIDATION AND TEST SET LOSSES WHILE TRAINING THE MODEL - TO TRACK THE MODEL AS TRAINING PROGRESSED.
+        model            : THE TRAINED MODEL.
     """
     print('Started multiway DCCA.')
 
@@ -339,7 +339,7 @@ def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False,
                 for trs in dataloader :
                     trs = trs.to(device)
                     outputs = model(trs)
-                    _, corr_loss, _,neg_corrs,_ = dmcca_model_loss(trs, outputs, i_shape1, o_dim, beta, use_all_singular_values)
+                    _, corr_loss, _,neg_corrs,_ = dmcca_model_loss(trs, outputs, i_shape1, o_dim, lambda_, use_all_singular_values)
                     trs = trs.cpu()
                     tr_corr_loss  = tr_corr_loss + corr_loss
                     count = count + 1
@@ -349,14 +349,14 @@ def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False,
 
             data_val = data_val.to(device)
             val_ops = model(data_val)
-            _, val_corr_loss, _,neg_corrs,_ = dmcca_model_loss(data_val, val_ops, i_shape1, o_dim, beta, use_all_singular_values)
+            _, val_corr_loss, _,neg_corrs,_ = dmcca_model_loss(data_val, val_ops, i_shape1, o_dim, lambda_, use_all_singular_values)
             data_val = data_val.cpu()
             torch.cuda.empty_cache()
             to_append[seed_num, 1, :] =  np.concatenate([[-val_corr_loss.detach().numpy()], -neg_corrs.detach().numpy()])
             
             data_te = data_te.to(device)
             test_ops = model(data_te)
-            _, test_corr_loss, _,neg_corrs,_ = dmcca_model_loss(data_te, test_ops, i_shape1, o_dim, beta, use_all_singular_values)
+            _, test_corr_loss, _,neg_corrs,_ = dmcca_model_loss(data_te, test_ops, i_shape1, o_dim, lambda_, use_all_singular_values)
             data_te = data_te.cpu()
             torch.cuda.empty_cache()
             to_append[seed_num, 2, :] =  np.concatenate([[-test_corr_loss.detach().numpy()], -neg_corrs.detach().numpy()])
@@ -385,7 +385,7 @@ def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False,
     model = model.to(device)
     model_optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=reg_par)
 
-    model, training_losses = train_the_dmcca_model(model, model_optimizer, train_set, val_set, te_set, N, epoch_num, batch_size, o_dim, i_shape1, beta, use_all_singular_values, path_name)
+    model, training_losses = train_the_dmcca_model(model, model_optimizer, train_set, val_set, te_set, N, epoch_num, batch_size, o_dim, i_shape1, lambda_, use_all_singular_values, path_name)
     
     model.eval()
     data = [train_set, val_set, te_set]
@@ -403,7 +403,7 @@ def dmcca_model(datas, o_dim, learning_rate=1e-3, use_all_singular_values=False,
 
 
 # TRAINS THE MODEL IN dmcca_model
-def train_the_dmcca_model(model, model_optimizer, data_tr, data_val, data_te, N, epoch_num, batch_size, o_dim, i_shape1, beta, use_all_singular_values, path_name, best_only=True):
+def train_the_dmcca_model(model, model_optimizer, data_tr, data_val, data_te, N, epoch_num, batch_size, o_dim, i_shape1, lambda_, use_all_singular_values, path_name, best_only=True):
     """
     ARGUMENTS: 
         THE DMCCA MODEL TO BE TRAINED, THE MODEL'S OPTIMIZER, THE DATA FOR TRAINING, VALIDATING AND TESTING THE MODEL; AND ALL OTHER HYPERPARAMETERS REQUIRED TO TRAIN THE MODEL.
@@ -426,7 +426,7 @@ def train_the_dmcca_model(model, model_optimizer, data_tr, data_val, data_te, N,
             model_optimizer.zero_grad()
             trs = trs.to(device)
             outputs = model(trs)
-            loss, _, _, _, _ = dmcca_model_loss(trs, outputs, i_shape1, o_dim, beta, use_all_singular_values)
+            loss, _, _, _, _ = dmcca_model_loss(trs, outputs, i_shape1, o_dim, lambda_, use_all_singular_values)
             loss.backward()
             model_optimizer.step()
             del trs
@@ -441,7 +441,7 @@ def train_the_dmcca_model(model, model_optimizer, data_tr, data_val, data_te, N,
             for trs in dataloader :
                 trs = trs.to(device)
                 outputs = model(trs)
-                loss, corr, mse, neg_corrs, mses = dmcca_model_loss(trs, outputs, i_shape1, o_dim, beta, use_all_singular_values)
+                loss, corr, mse, neg_corrs, mses = dmcca_model_loss(trs, outputs, i_shape1, o_dim, lambda_, use_all_singular_values)
                 trs = trs.cpu()
                 tr_loss  = tr_loss + loss
                 tr_corrs = tr_corrs + np.concatenate([[-corr], -neg_corrs.detach().numpy()])
@@ -456,31 +456,34 @@ def train_the_dmcca_model(model, model_optimizer, data_tr, data_val, data_te, N,
         torch.cuda.empty_cache()
         print('EPOCH : {}'.format(epoch))
         print('  Training corr LOSS   : {:0.4f}'.format(corr_epochs[epoch, 0, 0]))
-        print("{} - {} = {}       {}".format(corr_epochs[epoch, 0, 0], mses_epochs[epoch, 0, 0], -loss_epochs[epoch,0], corr_epochs[epoch, 0, 1:]))
+        # print("{} - {} = {}       {}".format(corr_epochs[epoch, 0, 0], mses_epochs[epoch, 0, 0], -loss_epochs[epoch,0], corr_epochs[epoch, 0, 1:]))
+        print("{} - {} = {}".format(corr_epochs[epoch, 0, 0], mses_epochs[epoch, 0, 0], -loss_epochs[epoch,0]))
 
         data_val = data_val.to(device)
         val_ops = model(data_val)
 
-        val_loss, corr, mse, neg_corrs, mses = dmcca_model_loss(data_val, val_ops, i_shape1, o_dim, beta, use_all_singular_values)
+        val_loss, corr, mse, neg_corrs, mses = dmcca_model_loss(data_val, val_ops, i_shape1, o_dim, lambda_, use_all_singular_values)
         loss_epochs[epoch, 1]    = val_loss
         corr_epochs[epoch, 1, :] = np.concatenate([[-corr], -neg_corrs.detach().numpy()])
         mses_epochs[epoch, 1, :] = np.concatenate([[mse], mses.detach().numpy()])
         data_val = data_val.cpu()
         torch.cuda.empty_cache()
         print('  Validation corr LOSS : {:0.4f}'.format(-corr))
-        print("{} - {} = {}      {}".format(-corr, mse, -val_loss, -neg_corrs))
+        # print("{} - {} = {}      {}".format(-corr, mse, -val_loss, -neg_corrs))
+        print("{} - {} = {}".format(-corr, mse, -val_loss))
         
         data_te = data_te.to(device)
         print(data_te.shape)
         test_ops = model(data_te)
-        test_loss, corr, mse, neg_corrs, mses = dmcca_model_loss(data_te, test_ops, i_shape1, o_dim, beta, use_all_singular_values)
+        test_loss, corr, mse, neg_corrs, mses = dmcca_model_loss(data_te, test_ops, i_shape1, o_dim, lambda_, use_all_singular_values)
         loss_epochs[epoch, 2]    = test_loss
         corr_epochs[epoch, 2, :] = np.concatenate([[-corr], -neg_corrs.detach().numpy()])
         mses_epochs[epoch, 2, :] = np.concatenate([[mse], mses.detach().numpy()])
         data_te = data_te.cpu()
         torch.cuda.empty_cache()
         print('  Test corr LOSS       : {:0.4f}'.format(-corr))
-        print("{} - {} = {}       {}".format(-corr, mse, -test_loss, -neg_corrs))
+        # print("{} - {} = {}       {}".format(-corr, mse, -test_loss, -neg_corrs))
+        print("{} - {} = {}".format(-corr, mse, -test_loss))
 
         print("  val. loss is : {:0.4f} & the min. loss is : {:0.4f}".format(val_loss, min_loss))
         print("  AND since, val_loss < min_loss is {}".format(val_loss < min_loss))
@@ -516,7 +519,7 @@ def generic_dcca3(stim_data, resp_data, type, o_dim, learning_rate=1e-3, use_all
     """
     CAN BE USED TO ACCESS DIFFERENT DCCA MODELS FROM THE deep_nets.py.
     THESE ARE THE MODELS EXPLORED AND REPORTED IN THE PAPER.
-    OTHER THAN SETTING THE DCCA MODEL, EVERYTHING ELSE IS SAME AS THE "final_dcca3".
+    OTHER THAN SETTING THE DCCA MODEL, EVERYTHING ELSE IS SAME AS THE "dcca_model".
     """
 
     stimtr  = stim_data[0]

@@ -36,12 +36,14 @@ def plot_losses_tr_val_te(losses, s, marker="o"):
 name_of_the_script = sys.argv[0].split('.')[0]
 a = sys.argv[1:]
 eyedee = str(a[0])  # ID OF THE EXPERIMENT.
-o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
+# o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
+num_blocks_start = int(a[1])
+num_blocks_end   = int(a[2])
 
-dropout    = 0.05
+# dropout    = 0.05
 learning_rate = 1e-3
 epoch_num  = 12
-batch_size = 1600
+batch_size = 800
 reg_par    = 1e-4
 o_dim      = 1
 use_all_singular_values = False
@@ -51,17 +53,17 @@ best_only  = True
 print(f"eyedee    : {eyedee}")
 print(f"best_only : {best_only}")
 print(f"epoch_num : {epoch_num}")
-print(f"dropout   : {dropout}")
+# print(f"dropout   : {dropout}")
 
 device = torch.device('cuda')
 torch.cuda.empty_cache()
 
 # CREATING A FOLDER TO STORE THE RESULTS
-path_name = f"{eyedee}_lmdc/"
+path_name = f"lmdc_{eyedee}_{num_blocks_start}_{num_blocks_end}/"
 
 i = 1
 while path.exists(path_name):
-    path_name = f"{eyedee}_lmdc_{i}/"
+    path_name = f"lmdc_{eyedee}_{num_blocks_start}_{num_blocks_end}_{i}/"
     i = i + 1
 
 del i
@@ -83,7 +85,7 @@ stim_chans_pre = 1
 
 pca_chans = 40
 
-D = [0, 0.05, 0.1, 0.2]
+D = [0.05]
 # CAN REPLACE D WITH A SINGLE ELEMENT LIST WHOSE VALUE IS EQUAL TO THE DESIRED DROPOUT.
 
 
@@ -93,7 +95,8 @@ def dcca_method(stim_data, resp_data, dropout, saving_name_root):
     CUSTOM DCCA METHOD
     """
     print(f"DCCA for {saving_name_root}")
-
+    
+    # using the dcca_model to train a DCCA model and obtain representations
     new_data_d, correlations, model_d = dcca_model(stim_data, resp_data, o_dim, learning_rate, use_all_singular_values, epoch_num, batch_size, reg_par, dropout, best_only, path_name, seed)
 
     x1 = new_data_d[2][0]
@@ -142,14 +145,14 @@ if speech_lmdc:
     for each_sub in subs[1:]: 
         str_subs += f"_{each_sub}"
 
-    num_blocks_start = 0
-    num_blocks_end   = 1
+    # num_blocks_start = 0
+    # num_blocks_end   = 20
     # CAN CHANGE BOTH VALUES ACCORDING TO THE INTERESTED CROSS-VALIDATION EXPERIMENTS.
     # CAN SUBMIT THESE TWO AS THE ARGUMENTS AND PARSE OVER THERE, FOR BULK EXPERIMENTS.
 
-    all_corrs = np.zeros((num_blocks, 1 + len(D), n_subs))
-    all_corrs_name =  f'{path_name}/speech_corrs_{str_subs}.npy'
+    tst_corrs = np.zeros((num_blocks, 1 + len(D), n_subs))
     val_corrs = np.zeros((num_blocks, 1 + len(D), n_subs))
+    tst_corrs_name =  f'{path_name}/speech_corrs_{str_subs}.npy'
     val_corrs_name =  f'{path_name}/speech_corrs_val_{str_subs}.npy'
 
     print(f"n_subs     : {n_subs}")
@@ -161,6 +164,13 @@ if speech_lmdc:
     print(f"num_blocks_net  : {num_blocks_end - num_blocks_start}")
 
     for block in range(num_blocks_start, num_blocks_end):
+
+        # can uncomment the following LMCCA code if LMCCA is not performed.
+        # It is commented to directly load the data obtained after LMCCA is done.
+
+        # ## LINEAR MCCA
+        # print("LINEAR MCCA + LCCA")
+
         # THE DATA data_subs_pre IS LOADED SUCH THAT 
         # ALL THE N EEG RESPONSES ARE LOADED IN THE FIRST N LISTS
         # AND THE LAST LIST HAS STIMULUS
@@ -170,73 +180,74 @@ if speech_lmdc:
         # data_subs_pre[n] = [TRAINING_DATA, VALIDATION_DATA, TESTING_DATA]
         # AND
         # data_subs_pre[n][j].shape = [Number_of_samples, dimensions]
-        data_subs_pre = load_mcca_data(subs, pca_chans, block)
+        # data_subs_pre = load_mcca_data(subs, pca_chans, block)
 
-        ## LINEAR MCCA
-        print("LINEAR MCCA + LCCA")
-        lmc_corrs = np.zeros(all_corrs.shape[1])
+        
+        # lmc_corrs = np.zeros(tst_corrs.shape[1])
+        # lmcca_data, lmlc_data, lmc_corrs, pre_lmdc_data = linear_mcca_with_stim(data_subs_pre, pca_chans, o_dim)
 
-        lmcca_data, lmlc_data, lmc_corrs, pre_lmdc_data = linear_mcca_with_stim(data_subs_pre, pca_chans, o_dim)
-
-        print(f'LMCCA + LCCA corrs are : {lmc_corrs}')
-        all_corrs[block,0]  = lmc_corrs
-        np.save(all_corrs_name, all_corrs)
+        # print(f'LMCCA + LCCA corrs are : {lmc_corrs}')
+        # tst_corrs[block,0]  = lmc_corrs
+        # np.save(tst_corrs_name, tst_corrs)
 
 
-        # PLOTTING LMLC OUTPUT 
-        for sub_num in range(n_subs):
-            x1 = lmlc_data[sub_num][2][0]
-            x2 = lmlc_data[sub_num][2][1]
-            s = f"{path_name}/speech_plot_data_lmlc_sub_{sub_num}"
-            plot_data(my_standardize(x1), my_standardize(x2), s)
+        # # PLOTTING LMLC OUTPUT 
+        # for sub_num in range(n_subs):
+        #     x1 = lmlc_data[sub_num][2][0]
+        #     x2 = lmlc_data[sub_num][2][1]
+        #     s = f"{path_name}/speech_plot_data_lmlc_sub_{sub_num}"
+        #     plot_data(my_standardize(x1), my_standardize(x2), s)
 
-        # SAVING THE LMLC OUTPUT
-        fp = open(f'{path_name}/speech_lmlc_data_block_{block}_{str_subs}.pkl', 'wb')
-        pkl.dump(lmlc_data, fp)
-        fp.close()
-        del lmlc_data
+        # # SAVING THE LMLC OUTPUT
+        # fp = open(f'{path_name}/speech_lmlc_data_block_{block}_{str_subs}.pkl', 'wb')
+        # pkl.dump(lmlc_data, fp)
+        # fp.close()
+        # del lmlc_data
 
-        # SAVING LMCCA + PROCESSED DATA SO THAT WE CAN DIRECTLY LOAD THEM TO DCCA METHOD FOR LMDC
-        fp = open(f'{path_name}/speech_pre_lmdc_data_block_{block}_{str_subs}.pkl', 'wb')
-        pkl.dump(pre_lmdc_data, fp)
-        fp.close()
-        del pre_lmdc_data
+        # # SAVING LMCCA + PROCESSED DATA SO THAT WE CAN DIRECTLY LOAD THEM TO DCCA METHOD FOR LMDC
+        # fp = open(f'{path_name}/speech_pre_lmdc_data_block_{block}_{str_subs}.pkl', 'wb')
+        # pkl.dump(pre_lmdc_data, fp)
+        # fp.close()
+        # del pre_lmdc_data
 
         # PERFORMING DCCA METHOD HERE.
         for d_cnt, dropout in enumerate(D):
-            print(f"block: {block}, subjects: {subs}, dropout : {dropout}")
+            try:
+                print(f"block: {block}, subjects: {subs}, dropout : {dropout}")
 
-            # DEEP CCA METHOD.
-            print("LMCCA + DCCA SPEECH")
-            dcca_corrs     = np.zeros((n_subs))
-            dcca_corrs_val = np.zeros((n_subs))
+                # DEEP CCA METHOD.
+                print("LMCCA + DCCA SPEECH")
+                dcca_corrs     = np.zeros((n_subs))
+                dcca_corrs_val = np.zeros((n_subs))
 
-            for sub in range(n_subs):
-                print(f"Sub: {subs[sub]}")
-                # LOADING THE LMCCA + PROCESSED DATA
-                data_subs = pkl.load(open(f'{path_name}/speech_pre_lmdc_data_block_{block}_{str_subs}.pkl', 'rb'))
-                data_stim = data_subs[sub][0]
-                data_sub  = data_subs[sub][1]
-                del data_subs
+                for sub in range(6, n_subs):
+                    print(f"Sub: {subs[sub]}")
+                    # LOADING THE LMCCA + PROCESSED DATA
+                    # data_subs = pkl.load(open(f'{path_name}/speech_pre_lmdc_data_block_{block}_{str_subs}.pkl', 'rb'))
+                    data_stim = data_subs[sub][0]
+                    data_sub  = data_subs[sub][1]
+                    del data_subs
 
-                saving_name_root = f"speech_lmdc_block_{block}_sub_{subs[sub]}_{dropout}"
-                dcca_corrs[sub], dcca_corrs_val[sub] = dcca_method(data_stim, data_sub, dropout, saving_name_root)
+                    saving_name_root = f"speech_lmdc_block_{block}_sub_{subs[sub]}_{dropout}"
+                    dcca_corrs[sub], dcca_corrs_val[sub] = dcca_method(data_stim, data_sub, dropout, saving_name_root)
 
-                print(f'LMDC corrs are : {dcca_corrs}')
+                    print(f'LMDC corrs are : {dcca_corrs}')
 
-                all_corrs[block, d_cnt+1] = dcca_corrs
-                val_corrs[block, d_cnt+1] = dcca_corrs_val
+                    tst_corrs[block, d_cnt+1] = dcca_corrs
+                    val_corrs[block, d_cnt+1] = dcca_corrs_val
 
-                np.save(all_corrs_name, all_corrs)
-                np.save(val_corrs_name, val_corrs)
+                    np.save(tst_corrs_name, tst_corrs)
+                    np.save(val_corrs_name, val_corrs)
 
-            print(f'LMDC corrs for {block}, {dropout} are : {all_corrs[block, 1+d_cnt]}')
-            print(f'saved speech.')
+                print(f'LMDC corrs for {block}, {dropout} are : {tst_corrs[block, 1+d_cnt]}')
+                print(f'saved speech.')
+            except:
+                pass
 
         print('saved')
 
 
-nmedh_lmdc = True
+nmedh_lmdc = False
 if nmedh_lmdc:
     # subs ARE THE SUBJECTS IDS TO WORK WITH
     # FOR THE LMCCA DENOISING STEP.
@@ -244,9 +255,9 @@ if nmedh_lmdc:
     
     # THE 4 STIMULI FEATURES ARE ORDERED AS:
     # ENV -> PCA1 -> FLUX -> RMS
-    all_corrs = np.zeros((4, 1 + len(D), 16, 12))
-    all_corrs_name = f'{path_name}/nmedh_corrs.npy'
+    tst_corrs = np.zeros((4, 1 + len(D), 16, 12))
     val_corrs = np.zeros((4, 1 + len(D), 16, 12))
+    tst_corrs_name = f'{path_name}/nmedh_corrs.npy'
     val_corrs_name = f'{path_name}/nmedh_corrs_val.npy'
 
     stims = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
@@ -256,9 +267,9 @@ if nmedh_lmdc:
         for stim_num, stim__ in enumerate(stims):
 
             print(f"Stimulus Feature: {stim_str}, Stimulus Number : {stim__}")
-            lmc_corrs = np.zeros(all_corrs.shape[1])
+            lmc_corrs = np.zeros(tst_corrs.shape[1])
             # data_path = '/data2/data/nmed-h/stim_data2/'
-            data_path = # LOAD YOUR DATA PATH HERE
+            data_path = None # LOAD YOUR DATA PATH HERE
 
             # LOAD DATA
 
@@ -278,23 +289,23 @@ if nmedh_lmdc:
             # EACH STIMULI FEATURE IS IN THE SHAPE T x 1
 
             mcca_data = pkl.load(open(f"{data_path}/mcca_{stim__}.pkl", "rb"))
-            datas = mcca_data[0]
+            all_data = mcca_data[0]
             stim_data = [mcca_data[1][0][:,stim_id].reshape(-1,1), mcca_data[1][1][:,stim_id].reshape(-1,1), mcca_data[1][2][:,stim_id].reshape(-1,1)]
 
-            datas.append(stim_data)
+            all_data.append(stim_data)
 
             n_subs = 12
 
             ## LINEAR MCCA
             print("LINEAR MCCA + LCCA")
-            lmc_corrs = np.zeros(all_corrs.shape[1])
+            lmc_corrs = np.zeros(tst_corrs.shape[1])
 
             # PERFORMING LMCCA, LMCCA + LCCA, LMCCA + PROCESSING FOR DCCA
-            lmcca_data, lmlc_data, lmc_corrs, pre_lmdc_data = linear_mcca_with_stim(datas, pca_chans, o_dim)
+            lmcca_data, lmlc_data, lmc_corrs, pre_lmdc_data = linear_mcca_with_stim(all_data, pca_chans, o_dim)
 
             print('LMCCA + LCCA corrs are : ' + str(lmc_corrs))
-            all_corrs[stim_id, stim_num, 0]  = lmc_corrs
-            np.save(all_corrs_name, all_corrs)
+            tst_corrs[stim_id, stim_num, 0]  = lmc_corrs
+            np.save(tst_corrs_name, tst_corrs)
 
 
             # PLOTTING LMLC OUTPUT 
@@ -342,13 +353,13 @@ if nmedh_lmdc:
 
                     print(f'LMDC corrs are : {dcca_corrs}')
 
-                    all_corrs[stim_id, stim_num, d_cnt+1] = dcca_corrs
+                    tst_corrs[stim_id, stim_num, d_cnt+1] = dcca_corrs
                     val_corrs[stim_id, stim_num, d_cnt+1] = dcca_corrs_val
 
-                    np.save(all_corrs_name, all_corrs)
+                    np.save(tst_corrs_name, tst_corrs)
                     np.save(val_corrs_name, val_corrs)
 
-                print(f'LMDC corrs for {stim_id}, {stim_num}, {dropout} are : {all_corrs[stim_id, stim_num, d_cnt+1]}')
+                print(f'LMDC corrs for {stim_id}, {stim_num}, {dropout} are : {tst_corrs[stim_id, stim_num, d_cnt+1]}')
                 
             print(f'saved music.')
 
@@ -358,18 +369,22 @@ if nmedh_lmdc:
 
 
 # FOR CUSTOM,
-# ONE CAN REPLACE THE datas LIST WITH THE INTERESTED DATASET.
-# DATAS IN A LIST OF N+1 ITEMS
+# ONE CAN REPLACE THE all_data LIST WITH THE INTERESTED DATASET.
+# all_data IS A LIST OF N+1 ITEMS
 # FIRST N ITEMS BELONG TO EEG RECORDINGS OF N SUBJECTS RESPECTIVELY.
 # LAST  1 ITEM BELONGS TO THE COMMON STIMULI PROVIDED TO ALL THE SUBJECTS
 # EACH ITEM OF THE (N+1) LENGTH LIST IS ARRANGED AS 
 # [TRAINING_DATA, VALIDATION_DATA, TEST_DATA]
 # EACH OF THESE DATA ARE IN THE SHAPE : NUMBER OF SAMPLES X VECTOR DIMENSION OF EACH SAMPLE
 #
-# AFTER LOADING THE DATA INTO datas,
+# AFTER LOADING THE DATA INTO all_data,
 # ONE CAN CALL THE linear_mcca_with_stim FUNCTION ON IT
 # IT RETURNS 
 # THE DENOISED EEG RECORDINGS, 
 # DENOISED STIMULI,
 # LMLC DATA,
-# DATA FOR PERFORMING LMDC.  
+# DATA FOR PERFORMING LMDC. 
+
+# Then providing the LMCCA outputs 
+# to dcca_method for performing DCCA
+# This will give the final representations

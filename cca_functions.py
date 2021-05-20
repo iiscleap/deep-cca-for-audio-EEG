@@ -21,12 +21,10 @@ def my_PCA(X, dout):
     X_norm = X - X_mean
     X_cov = np.dot(X_norm.T, X_norm)
     din = X.shape[1]
-    
     [D, W] = np.linalg.eigh(X_cov)
     # The eigenvalues in ascending order, each repeated according to its multiplicity.
     D = D[-dout:]
     W = W[:, -dout:]
-
     outs = np.dot(X_norm, W)
     return X_mean, W, outs
 
@@ -73,7 +71,7 @@ def filtem(x1, x2, x3, y1, y2, y3, num1=1, num2=60):
     # y1 : resp_train
     # y2 : resp_val
     # y3 : resp_test
-    mat2 = scipy.io.loadmat('psi.mat')
+    mat2 = scipy.io.loadmat('/data2/jaswanthr/data/new_psi.mat')
     psi = mat2['psi'][0]
     nfilts = 21
     print('Filtering loaded.')
@@ -99,13 +97,12 @@ def filtone(x1, x2, x3):
     """
     USED TO FILTER ONLY ONE SET OF DATA.
     """
-    mat2 = scipy.io.loadmat('psi.mat')
+    mat2 = scipy.io.loadmat('/data2/jaswanthr/data/new_psi.mat')
     psi = mat2['psi'][0]
     nfilts = 21
     num = x1.shape[1]
     print('Filtering loaded.')
     data_ = [x1, x2, x3]
-
     new_data = []
     for data_num, xx in enumerate(data_):
         xx_new = []
@@ -116,7 +113,6 @@ def filtone(x1, x2, x3):
             xx_new.append(X)
         xx_new = np.vstack(xx_new).T
         new_data.append(xx_new)
-
     print('Filtered.')
     [x1_new, x2_new, x3_new] = new_data
     return x1_new, x2_new, x3_new
@@ -155,27 +151,22 @@ def my_corr(X1, X2, K=None, rcov1=0, rcov2=0):
         X1 = X1 - m1
         m2 = np.mean(X2, 0)
         X2 = X2 - m2
-
         S11 = np.dot(X1.T, X1)/(N-1) + rcov1*np.eye(d1)
         S22 = np.dot(X2.T, X2)/(N-1) + rcov2*np.eye(d2)
         S12 = np.dot(X1.T, X2)/(N-1)
-
         D1, V1 = np.linalg.eigh(S11)
         D2, V2 = np.linalg.eigh(S22)
         # D1 = (D1 + abs(D1)) / 2 + 1e-10
         # D2 = (D2 + abs(D2)) / 2 + 1e-10
-
         idx1 = np.nonzero(D1 > 1e-10)
         D1 = D1[idx1]
         V1 = np.squeeze(V1[:, idx1])
         idx2 = np.nonzero(D2 > 1e-10)
         D2 = D2[idx2]
         V2 = np.squeeze(V2[:, idx2])
-        
         K11 = np.dot(np.dot(V1, np.diag(D1 ** -0.5)), V1.T)
         K22 = np.dot(np.dot(V2, np.diag(D2 ** -0.5)), V2.T)
         T = np.dot(np.dot(K11, S12), K22)
-        
         [U, D, V] = np.linalg.svd(T)
         # U = U[:, 0:K]
         # V = V[:, 0:K]
@@ -271,7 +262,7 @@ def cca_model(stim_data, resp_data, F):
         respte_139  = resp_data[2]
 
     # STANDARDIZING THE DATA BEFORE PROVIDING TO THE CCA MODEL.
-    stim5_tr, mean1, std1   = my_standardize(stim5_tr)
+    stim5_tr,   mean1, std1 = my_standardize(stim5_tr)
     resptr_139, mean2, std2 = my_standardize(resptr_139)
     stim5_te   = (stim5_te   - mean1) / std1
     respte_139 = (respte_139 - mean2) / std2
@@ -495,6 +486,23 @@ def pca_filt_pca_resp(data_sub):
     del x1_139, x2_139, x3_139
 
     return new_data_sub
+
+def pca_filt_resp(data_sub):
+    """
+    TO CONVERT ANY D DIMENSIONAL EEG DATA TO 139D (AS PROCESSED BY THE LINEAR CCA METHOD.)
+    ARGUMENT: 
+        data_sub: A 3 ELEMENT LIST OF EEG DATA. [TR_DATA, VAL_DATA, TE_DATA]. EACH OF SHAPE: T x D
+    RETURNS:
+        new_data_sub : A 3 ELEMENT LIST OF TRANSFORMED EEG DATA. [TR_DATA, VAL_DATA, TE_DATA]. EACH OF SHAPE: T x 139
+    """
+    [meanp, W, x1_60] = my_PCA(data_sub[0], 60)
+    x2_60 = apply_PCA(data_sub[1], meanp, W)
+    x3_60 = apply_PCA(data_sub[2], meanp, W)
+    new_data_sub = [x1_60, x2_60, x3_60]
+    del x1_60, x2_60, x3_60
+    new_data_sub = filtone(new_data_sub[0], new_data_sub[1], new_data_sub[2])
+    return new_data_sub
+
 
 def linear_mcca_resps_only(datas, new_chans, o_dim):
     """

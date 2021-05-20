@@ -10,6 +10,12 @@ from cca_functions  import *
 from speech_helper  import load_data
 from music_helper   import stim_resp
 
+name_of_the_script = sys.argv[0].split('.')[0]
+a = sys.argv[1:]
+eyedee = str(a[0])  # ID OF THE EXPERIMENT. For naming the folder created to store the results.
+o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
+
+
 def plot_data(x, y,s):
     plt.clf()
     x = x[0]
@@ -19,31 +25,20 @@ def plot_data(x, y,s):
     plt.legend(['stim', 'resp'])
     plt.savefig(f'{s}.eps', format="eps")
 
-name_of_the_script = sys.argv[0].split('.')[0]
-a = sys.argv[1:]
-eyedee = str(a[0])  # ID OF THE EXPERIMENT.
-o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
 
 print(f"eyedee : {eyedee}")
 
-# CREATING A FOLDER TO STORE THE RESULTS
-path_name = f"{eyedee}_lcca/"
+# Creating a folder to store the results
+path_name = f"lcca_{eyedee}/"
 
 i = 1
 while path.exists(path_name):
-    path_name = f"{eyedee}_lcca_{i}/"
+    path_name = f"lcca_{eyedee}_{i}/"
     i = i + 1
 
 del i
 os.mkdir(path_name)
-# print(path_name)
-
-
-# NUMBER OF CHANNELS IN THE PROCESSED STIMULI AFTER FILTERBANK
-stim_chans = 21
-# NUMBER OF CHANNELS IN prePREPROCESSED STIMULI (1D)
-stim_chans_pre = 1
-
+print(path_name)
 
 
 # HELPER FUNCTION FOR PERFORMING LCCA TO NMED-H DATASET
@@ -65,13 +60,13 @@ def lcca(stim_tr, stim_val, stim_te, resp_tr, resp_val, resp_te, sub_num, stim_s
 
 
 
-speech_lcca = False
+speech_lcca = True
 if speech_lcca:
-    num_blocks = 20        # IF SPEECH DATA BY LIBERTO ET AL.
+    num_blocks = 20        # Number of sessions in the SPEECH DATA BY LIBERTO ET AL.
 
     # subs ARE THE SUBJECTS IDS TO WORK WITH
-    subs = [1,2]         # REPLACE THEM WITH THE INTERESTED SUBJECTS.
-    subs = sorted(subs)  # TO KEEP THEIR IDS SORTED
+    subs = [1, 2]         # REPLACE THEM WITH THE INTERESTED SUBJECTS.
+    subs = sorted(subs)   # TO KEEP THEIR IDS SORTED
     n_subs = len(subs)
 
     str_subs = str(subs[0])
@@ -86,21 +81,26 @@ if speech_lcca:
     print(f"num_blocks: {num_blocks}")
 
     for block in range(num_blocks):
+
         data_subs = load_data(subs, block)
+        data_stim = data_subs[-1]
         # data_subs IS A LIST OF N SUBJECTS DATA AND 1 COMMON STIMULUS DATA (AS THE LAST ELEMENT.)
         # ALL THE DATA ARE PROCESSED USING PCA AND THE FILTERBANK
+
 
         # LINEAR CCA METHOD.
         print("LCCA")
         lcca_corrs = np.zeros((n_subs))
         new_data_lcca = []
         for sub in range(n_subs):
-            lcca_corrs[sub], sub_data = cca_model(data_subs[-1], data_subs[sub], o_dim)
+            data_sub = data_subs[sub]
+
+            lcca_corrs[sub], sub_data = cca_model(data_stim, data_sub, o_dim)
             new_data_lcca.append(sub_data)
             x1 = sub_data[2][0]
             x2 = sub_data[2][1]
             s = f"{path_name}/speech_plot_data_lcca_sub_{block}_{sub}"
-            plot_data(my_standardize(x1), my_standardize(x2), s)
+            # plot_data(my_standardize(x1), my_standardize(x2), s)
 
         del new_data_lcca
         # CAN SAVE THEM IF REQUIRED.
@@ -115,7 +115,7 @@ if speech_lcca:
 
 
 
-nmedh_lcca = True
+nmedh_lcca = False
 if nmedh_lcca:
     fs = 80
     N = 125
@@ -229,7 +229,7 @@ if nmedh_lcca:
 
 
 
-custom_data = True
+custom_data = False
 if custom_data:
     # TO PERFORM THE LINEAR CCA METHOD ON A CUSTON AUDIO-EEG DATA.
     
@@ -261,6 +261,7 @@ if custom_data:
     resp_val = apply_PCA(resp_val, meanp, W)
     resp_te  = apply_PCA(resp_te, meanp, W)
 
+
     # SECOND, PROCESS THE STIMULUS.
     # 1. IF NOT 1D, CAN PCA TO 1D. (OPTIONAL. CAN LEAVE IT TOO.)
     # 2. FILTERBANK
@@ -284,8 +285,6 @@ if custom_data:
     pkl.dump(new_data_l, fp)
     fp.close()
     del new_data_l
-
-
 
 
 

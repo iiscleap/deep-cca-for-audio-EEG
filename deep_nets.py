@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
+
 
 
 # DCCA MODEL
@@ -32,9 +34,6 @@ class get_13network(nn.Module):
         x = self.drp(self.sig(self.fc2(x)))
         x = self.lre(self.fc3(x))
         return x
-
-
-
 
 
 # DMCCA MODEL
@@ -93,8 +92,8 @@ class dmcca_model_n_resp_1_stim(nn.Module):
             exec(f'self.enc_net{i} = enc_model(self.i_shape1, self.mid_shape, self.o_dim, self.p)')
             exec(f'self.dec_net{i} = dec_model(self.n_resps, self.i_shape1, self.mid_shape, self.mid_shape2, self.o_dim, self.p)')
 
-        self.enc_nets = enc_model(self.i_shape2, self.mid_shape, self.o_dim, self.p)
-        self.dec_nets = dec_model(self.n_resps, self.i_shape2, self.mid_shape, self.mid_shape2, self.o_dim, self.p)
+        self.enc_nets = enc_model(self.i_shape2, self.mid_shape, self.o_dim,     self.p)
+        self.dec_nets = dec_model(self.n_resps,  self.i_shape2,  self.mid_shape, self.mid_shape2, self.o_dim, self.p)
     
     def forward(self, x):
         x1 = []
@@ -448,8 +447,6 @@ class get_10000network(nn.Module):
         x = self.drp(self.sig(self.fc2(x)))
         x = self.lre(self.fc3(x))
         return x
-
-
 
 
 

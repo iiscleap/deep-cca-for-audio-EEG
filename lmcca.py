@@ -28,29 +28,25 @@ o_dim = int(a[1])   # THE INTERESTED OUTPUTS DIMENSIONALITY
 print(f"eyedee : {eyedee}")
 
 # CREATING A FOLDER TO STORE THE RESULTS
-path_name = f"{eyedee}_lcca/"
+path_name = f"lmcca_{eyedee}/"
 
 i = 1
 while path.exists(path_name):
-    path_name = f"{eyedee}_lcca_{i}/"
+    path_name = f"lmcca_{eyedee}_{i}/"
     i = i + 1
 
 del i
 os.mkdir(path_name)
-# print(path_name)
+print(path_name)
 
 
-# NUMBER OF CHANNELS IN THE PROCESSED STIMULI AFTER FILTERBANK
-stim_chans = 21
-# NUMBER OF CHANNELS IN prePREPROCESSED STIMULI (1D)
-stim_chans_pre = 1
-
+# For stimuli lags (d_s)
 pca_chans = 40
 
 
 speech_lmlc = True
 if speech_lmlc:
-    num_blocks = 20        # IF SPEECH DATA BY LIBERTO ET AL.
+    num_blocks = 20        # Number of Sessins in the SPEECH DATA BY LIBERTO ET AL.
 
     # subs ARE THE SUBJECTS IDS TO WORK WITH
     subs = [1, 2]       # REPLACE WITH THE REQUIRED SUBJECTS' IDS.
@@ -62,13 +58,13 @@ if speech_lmlc:
         str_subs += f"_{each_sub}"
 
     num_blocks_start = 0
-    num_blocks_end   = 1
+    num_blocks_end   = 20
     # CAN CHANGE BOTH VALUES ACCORDING TO THE INTERESTED CROSS-VALIDATION EXPERIMENTS.
     # CAN SUBMIT THESE TWO AS THE ARGUMENTS AND PARSE OVER THERE, FOR BULK EXPERIMENTS.
 
-    all_corrs = np.zeros((num_blocks, n_subs))
-    all_corrs_name =  f'{path_name}/speech_corrs_{str_subs}.npy'
+    tst_corrs = np.zeros((num_blocks, n_subs))
     val_corrs = np.zeros((num_blocks, n_subs))
+    tst_corrs_name =  f'{path_name}/speech_corrs_{str_subs}.npy'
     val_corrs_name =  f'{path_name}/speech_corrs_val_{str_subs}.npy'
 
     print(f"n_subs     : {n_subs}")
@@ -92,21 +88,21 @@ if speech_lmlc:
 
         ## LINEAR MCCA
         print("LINEAR MCCA + LCCA")
-        lmc_corrs = np.zeros(all_corrs.shape[1])
+        lmc_corrs = np.zeros(tst_corrs.shape[1])
 
         lmcca_data, lmlc_data, lmc_corrs, pre_lmdc_data = linear_mcca_with_stim(data_subs_pre, pca_chans, o_dim)
 
         print(f'LMCCA + LCCA corrs are : {lmc_corrs}')
-        all_corrs[block,:]  = lmc_corrs
-        np.save(all_corrs_name, all_corrs)
+        tst_corrs[block,:]  = lmc_corrs
+        np.save(tst_corrs_name, tst_corrs)
 
 
-        # PLOTTING LMLC OUTPUT 
-        for sub_num in range(n_subs):
-            x1 = lmlc_data[sub_num][2][0]
-            x2 = lmlc_data[sub_num][2][1]
-            s = f"{path_name}/speech_plot_data_lmlc_sub_{sub_num}"
-            plot_data(my_standardize(x1), my_standardize(x2), s)
+        # # PLOTTING LMLC OUTPUT 
+        # for sub_num in range(n_subs):
+        #     x1 = lmlc_data[sub_num][2][0]
+        #     x2 = lmlc_data[sub_num][2][1]
+        #     s = f"{path_name}/speech_plot_data_lmlc_sub_{sub_num}"
+        #     plot_data(my_standardize(x1), my_standardize(x2), s)
 
         # SAVING THE LMLC OUTPUT
         fp = open(f'{path_name}/speech_lmlc_data_block_{block}_{str_subs}.pkl', 'wb')
@@ -124,11 +120,10 @@ if speech_lmlc:
         del pre_lmdc_data
 
         # CAN PERFORM DCCA METHOD HERE.
-
         print('saved')
 
 
-nmedh_lmlc = True
+nmedh_lmlc = False
 if nmedh_lmlc:
     # subs ARE THE SUBJECTS IDS TO WORK WITH
     # FOR THE LMCCA DENOISING STEP.
@@ -136,8 +131,8 @@ if nmedh_lmlc:
     
     # THE 4 STIMULI FEATURES ARE ORDERED AS:
     # ENV -> PCA1 -> FLUX -> RMS
-    all_corrs = np.zeros((4, 16, 12))
-    all_corrs_name = f'{path_name}/nmedh_corrs.npy'
+    tst_corrs = np.zeros((4, 16, 12))
+    tst_corrs_name = f'{path_name}/nmedh_corrs.npy'
     val_corrs = np.zeros((4, 16, 12))
     val_corrs_name = f'{path_name}/nmedh_corrs_val.npy'
 
@@ -148,7 +143,7 @@ if nmedh_lmlc:
         for stim_num, stim__ in enumerate(stims):
 
             print(f"Stimulus Feature: {stim_str}, Stimulus Number : {stim__}")
-            lmc_corrs = np.zeros(all_corrs.shape[1])
+            lmc_corrs = np.zeros(tst_corrs.shape[1])
             # data_path = '/data2/data/nmed-h/stim_data2/'
             data_path = '/data2/jaswanthr/data/nmed-h/stim_data2/'
             # data_path = # LOAD YOUR DATA PATH HERE
@@ -171,23 +166,23 @@ if nmedh_lmlc:
             # EACH STIMULI FEATURE IS IN THE SHAPE T x 1
 
             mcca_data = pkl.load(open(f"{data_path}/mcca_{stim__}.pkl", "rb"))
-            datas = mcca_data[0]
+            all_data = mcca_data[0]
             stim_data = [mcca_data[1][0][:,stim_id].reshape(-1,1), mcca_data[1][1][:,stim_id].reshape(-1,1), mcca_data[1][2][:,stim_id].reshape(-1,1)]
 
-            datas.append(stim_data)
+            all_data.append(stim_data)
 
             n_subs = 12
 
             ## LINEAR MCCA
             print("LINEAR MCCA + LCCA")
-            lmc_corrs = np.zeros(all_corrs.shape[1])
+            lmc_corrs = np.zeros(tst_corrs.shape[1])
 
             # PERFORMING LMCCA, LMCCA + LCCA, LMCCA + PROCESSING FOR DCCA
-            lmcca_data, lmlc_data, lmc_corrs, pre_lmdc_data = linear_mcca_with_stim(datas, pca_chans, o_dim)
+            lmcca_data, lmlc_data, lmc_corrs, pre_lmdc_data = linear_mcca_with_stim(all_data, pca_chans, o_dim)
 
             print('LMCCA + LCCA corrs are : ' + str(lmc_corrs))
-            all_corrs[stim_id, stim_num]  = lmc_corrs
-            np.save(all_corrs_name, all_corrs)
+            tst_corrs[stim_id, stim_num]  = lmc_corrs
+            np.save(tst_corrs_name, tst_corrs)
 
 
             # PLOTTING LMLC OUTPUT 
@@ -219,18 +214,21 @@ if nmedh_lmlc:
 
 
 # FOR CUSTOM,
-# ONE CAN REPLACE THE datas LIST WITH THE INTERESTED DATASET.
-# DATAS IN A LIST OF N+1 ITEMS
+# ONE CAN REPLACE THE all_data LIST WITH THE INTERESTED DATASET.
+# all_data IS A LIST OF N+1 ITEMS
 # FIRST N ITEMS BELONG TO EEG RECORDINGS OF N SUBJECTS RESPECTIVELY.
 # LAST  1 ITEM BELONGS TO THE COMMON STIMULI PROVIDED TO ALL THE SUBJECTS
 # EACH ITEM OF THE (N+1) LENGTH LIST IS ARRANGED AS 
 # [TRAINING_DATA, VALIDATION_DATA, TEST_DATA]
 # EACH OF THESE DATA ARE IN THE SHAPE : NUMBER OF SAMPLES X VECTOR DIMENSION OF EACH SAMPLE
 #
-# AFTER LOADING THE DATA INTO datas,
+# AFTER LOADING THE DATA INTO all_data,
 # ONE CAN CALL THE linear_mcca_with_stim FUNCTION ON IT
+#
 # IT RETURNS 
-# THE DENOISED EEG RECORDINGS, 
-# DENOISED STIMULI,
-# LMLC DATA,
-# DATA FOR PERFORMING LMDC.  
+    # THE DENOISED EEG RECORDINGS, 
+    # DENOISED STIMULI,
+    # LMLC DATA,
+    # DATA FOR PERFORMING LMDC.  
+
+
